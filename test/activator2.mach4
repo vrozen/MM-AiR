@@ -1,0 +1,6 @@
+pool A at 10
+auto drain B 
+A --> B
+A .>5.> B
+
+assert sane : A > 4 "sane"

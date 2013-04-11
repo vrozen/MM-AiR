@@ -1,0 +1,9 @@
+auto source S1
+auto source S2
+pool A
+pool B
+
+S1 --> A
+S2 -3-> B
+
+assert sane : B == 3*A "flow works"

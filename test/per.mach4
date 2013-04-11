@@ -1,0 +1,14 @@
+/*
+  This test demonstrates flows that happen once every so many steps.
+*/
+
+source tick
+auto pool turn
+source units
+auto pool defence
+
+tick -1-> turn
+units -1|4-> defence
+
+assert ends : turn < 16 "ok"
+assert sane : turn == 16 || defence < 4 "at turn 16 defence should be 4"

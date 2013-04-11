@@ -1,0 +1,14 @@
+source steps
+auto pool count
+steps --> count
+assert ends : count < 2 "ok"
+
+pool A at 3
+auto all pool B
+auto all pool C
+
+A -2-> B
+A -2-> C
+
+assert sane : count > 0 && B == 2 || count > 0 && C == 2
+  "pulling pools compete for resources when they are scarce"
