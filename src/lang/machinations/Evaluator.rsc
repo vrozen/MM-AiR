@@ -1,3 +1,21 @@
+@license{
+  Copyright (c) 2009-2013 CWI / HvA
+  All rights reserved. This program and the accompanying materials
+  are made available under the terms of the Eclipse Public License v1.0
+  which accompanies this distribution, and is available at
+  http://www.eclipse.org/legal/epl-v10.html
+}
+/*****************************************************************************/
+/*!
+* Machinations Evaluator
+* @package      lang::machinations
+* @file         Evaluator.rsc
+* @brief        Defines how given a state, its successors are calculated.
+* @contributor  Riemer van Rozen - rozen@cwi.nl - HvA, CREATE-IT / CWI
+* @date         April 11th 2013
+* @note         Compiler/Assembler: Rascal MPL.
+*/
+/*****************************************************************************/
 module lang::machinations::Evaluator
 
 import IO;

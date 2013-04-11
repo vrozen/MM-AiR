@@ -1,3 +1,21 @@
+@license{
+  Copyright (c) 2009-2011 CWI and HvA
+  All rights reserved. This program and the accompanying materials
+  are made available under the terms of the Eclipse Public License v1.0
+  which accompanies this distribution, and is available at
+  http://www.eclipse.org/legal/epl-v10.html
+}
+/*****************************************************************************/
+/*!
+* Micro-Machinations Syntax
+* @package      lang::machinations
+* @file         Syntax.rsc
+* @brief        Defines the syntax of Micro-Machiations
+* @contributor  Riemer van Rozen - rozen@cwi.nl - HvA, CREATE-IT / CWI
+* @date         June 1st 2012
+* @note         Compiler/Assembler: Rascal MPL.
+*/
+/*****************************************************************************/
 module lang::machinations::Syntax
 
 /******************************************************************************** 
