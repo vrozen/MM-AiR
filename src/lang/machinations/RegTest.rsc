@@ -1,4 +1,22 @@
-module lang::machinations::test::RegTest
+@license{
+  Copyright (c) 2009-2013 CWI / HvA
+  All rights reserved. This program and the accompanying materials
+  are made available under the terms of the Eclipse Public License v1.0
+  which accompanies this distribution, and is available at
+  http://www.eclipse.org/legal/epl-v10.html
+}
+/*****************************************************************************/
+/*!
+* Micro-Machinations Regression Test
+* @package      lang::machinations
+* @file         RegTest.rsc
+* @brief        Defines the Micro-Machinations regression test.
+* @contributor  Riemer van Rozen - rozen@cwi.nl - HvA, CREATE-IT / CWI
+* @date         April 11th 2013
+* @note         Compiler/Assembler: Rascal MPL.
+*/
+/*****************************************************************************/
+module lang::machinations::RegTest
 
 import lang::machinations::Syntax;
 import lang::machinations::AST;
@@ -22,6 +40,8 @@ import String;
 private loc MACHINATIONS_LOC      = |project://machinations/test|;
 private str MACHINATIONS_SFX      = ".mach4";
 
+//TODO
+/* 
 data Verdict
   = success(loc l)
   | parserFail(loc l)
@@ -229,4 +249,4 @@ private Verdict lua_test(loc l)
   }
   
   return success(l);
-}
+}*/
