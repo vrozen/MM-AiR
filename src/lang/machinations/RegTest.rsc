@@ -37,216 +37,145 @@ import Message;
 import IO;
 import String;
 
-private loc MACHINATIONS_LOC      = |project://machinations/test|;
-private str MACHINATIONS_SFX      = ".mach4";
+private loc MACHINATIONS_LOC = |project://MM-AiR/test|;
+private str MACHINATIONS_SFX = ".mach4";
 
-//TODO
-/* 
 data Verdict
   = success(loc l)
-  | parserFail(loc l)
-  | imploderFail(loc l)
-  | transformerFail(loc l)
-  | folderFail(loc l)
-  | labelerFail(loc l)
-  | checkerFail(loc l)
-  | dfAnalyzerFail(loc l)
-  | rdAnalyzerFail(loc l)
-  | messageFail(loc l)
-  | typeFail(loc l)
+  | parserFail(loc l, str e)
+  | imploderFail(loc l, str e)
+  | desugarFail(loc l, str e)
+  | labelerFail(loc l, str e)
+  | flattenerFail(loc l, str e)
+  | evaluatorFail(loc l, str e)
+  | assertionFail(loc l, str e)
+  | preprocessorFail(loc l, str e)
   ;
   
 public test bool testAll()
 {
-  return testAll(LUA_LOC) && testAll(LUA_LOC_2);
+  return testAll(MACHINATIONS_LOC, MACHINATIONS_SFX);
 }
   
-public bool testAll(loc files_loc)
+public bool testAll(loc files_loc, str suffix)
 {
-  set[loc] ltFiles = getFiles(LUA_TYPE_LOC, LUA_TYPE_SFX);
-  set[Verdict] ltVerdicts = {lua_type_test(file) | file <- ltFiles};
-  set[Verdict] ltFailures =  {v | v <- ltVerdicts, success(_) !:= v};
+  set[loc] files = getFiles(files_loc, suffix);
+  set[Verdict] verdicts = {machinations_test(file) | file <- files};
+  set[Verdict] failures = {v | v <- verdicts, success(_) !:= v};
 
-  set[loc] luaFiles = getFiles(files_loc, LUA_SFX); 
-  set[Verdict] luaVerdicts = {lua_test(file) | file <- luaFiles};
-  set[Verdict] luaFailures =  {v | v <- luaVerdicts, success(_) !:= v};
-
-  iprintln(ltVerdicts);
-  iprintln(luaVerdicts);
-
-  return ltFailures == {} && luaFailures == {};
+  iprintln(failures);
+  return failures == {};
 }
 
-private set[loc] getFiles(loc dir, str suffix)
+private set[loc] getFiles(loc files_loc, str suffix)
+ = {files_loc+"/<file>" | file <- listEntries(files_loc), endsWith(file, suffix)};
+
+private Verdict machinations_test(loc l)
 {
-  return {dir+"/<file>" | file <- listEntries(dir), endsWith(file, suffix)};
-}
+  Tree t;
+  Machinations m1, m2, m3, m4, m5;
+  Mach2 m6;
+  list[Msg] msgs3, msgs5, msgs6;
+  list[tuple[State,Transition]] trace;
+  
+  println(l);
 
-private Verdict lua_type_test(loc l)
-{
-  Tree x;
-  LT ast;  
-  LuaTypes ts;
-  list[Msg] m;
-  
-  iprintln(l);
-  
-  //1. Parse
+  //println("1. Parse");
   try
   {
-    x = lua_type_parse(l);
+    t = machinations_parse(l);
   }
   catch e:
   {
-    return parserFail(l);
+    return parserFail(l, toString(e));
   }
   
-  //2. Implode
+  //println("2. Implode");
   try
   {
-    ast = lua_type_implode(x);
+    m1 = machinations_implode(t); 
   }
   catch e:
   {
-    return imploderFail(l);
-  }
-
-  //3. Create Type
-  try
-  {
-    ts = lua_type_toType(ast);
-  }
-  catch e:
-  {
-    return typeFail(l);
-  }  
-   
-  //3. Check
-  try
-  { 
-    <ts, m> = lua_type_Checker_check(ts);
-  }
-  catch e:
-  {
-    return checkerFail(l);
-  }
-
-  //4. Report
-  try
-  { 
-    set[Message] errors = getErrors(m);
-  }
-  catch e:
-  {
-    return messageFail(l);
-  }
-
-  return success(l);
-}
-
-private Verdict lua_test(loc l)
-{
-  //define tree, ast, seg, checker and analyzer
-  Tree x;
-  Block ast_1, ast_2, ast_3, ast_4, ast_5;
-  DFSegment seg;
-  Analyzer a = NEW_Analyzer;
-  Checker c = Checker_new(lua_getTypes());
-
-  iprintln(l);
-
-  //1. Parse
-  try
-  {
-    x = lua_parse(l);
-  }
-  catch e:
-  {
-    return parserFail(l);
+    return imploderFail(l, toString(e));
   }
   
-  //2. Implode
+  //println("3. Desugar");
   try
   {
-    ast_1 = lua_implode(x);
+    m2 = machinations_desugar(m1);
   }
   catch e:
   {
-    return imploderFail(l);
+    return desugarFail(l, toString(e));
   }
   
-  //3. Transform
+  //println("4. Flatten");
   try
   {
-    ast_2 = lua_transform(ast_1);
+    <m3, msgs3> = machinations_flatten(m2);
+    if(msgs3 != [])
+    { 
+      throw msgs3;
+    }
   }
   catch e:
   {
-    return transformerFail(l);
+    return flattenerFail(l, toString(e));
   }
   
-  //4. Fold
+  //println("5. Desugar Flat");
   try
   {
-    <c.messages, ast_3> = lua_fold(c.messages, ast_2); 
+    m4 = machinations_desugarFlat(m3);
   }
   catch e:
   {
-    return folderFail(l);
+    return desugarFail(l,toString(e));
   }
   
-  //5. Label
+  //println("6. Label");
   try
   {
-    <a.nodes, ast_4> = lua_setLabels(ast_3);
+    <m5, msgs5> = machinations_label(m4);
+    if(msgs5 != [])
+    {
+      throw msgs5;
+    }
   }
   catch e:
   {
-    return labelFail(l);
+    return labelerFail(l,toString(e));
   }
   
-  //6. Check
+  //println("7. Preprocess\n");
   try
-  { 
-    <c, ast_5> = lua_Checker_check(c, ast_4);
+  {
+    m6 = machinations_preprocess(m5);
   }
   catch e:
   {
-    return checkerFail(l);
+    return preprocessorFail(l,toString(e));
   }
 
-  //7. Data Flow Analysis
+  //println("8. Simulate");
   try
-  {  
-    <a, seg> = lua_DFAnalyzer_analyze(a, ast_5);
+  {
+    <trace, msgs6> = machinations_simulate(m6, 100);
+    if([msg_AssertionViolated(State s, Element e)] := msgs6 &&
+       e.name.name == "ends")
+    {
+      ;
+    }
+    else if(msgs6 != [])
+    {      
+      throw msgs6;
+    }
   }
   catch e:
   {
-    return dfAnalyzerFail(l);
-  }
-  
-  //8. Reaching Definitions Analysis
-  try
-  {
-    a = lua_RDAnalyzer_analyze(a, c, ast_5, seg);
-  }
-  catch e:
-  {
-    return rdAnalyzerFail(l);
-  }
-  
-  //9. Error reporting
-  try
-  {
-    set[Message] errors = getErrors(c) + getErrors(a);
-    set[Message] warnings = getWarnings(c) + getWarnings(a);
-    set[Message] infos = getInfo(c) + getInfo(a);
-    messages = errors + warnings + infos;
-  }
-  catch e:
-  {
-    return messageFail(l);
+    return evaluatorFail(l,toString(e));
   }
   
   return success(l);
-}*/
+}

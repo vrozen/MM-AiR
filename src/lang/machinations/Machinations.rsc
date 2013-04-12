@@ -142,7 +142,7 @@ public void compile(Tree t, loc l)
   {
     Mach2 m6 = machinations_preprocess(m5);
     str promelaModel = machinations_toPromela(m6);
-    println("promela model:\n<promelaModel>");    
+    println("\n\n\n\n//promela model:\n<promelaModel>\n\n");    
   }
 }
 
@@ -186,28 +186,33 @@ public void registerMachinations()
 
 public void probeer()
 {
-  loc f = |project://machinations/test/city.mach4|;
+  loc f = |project://MM-AiR/test/example/city.mach4|;
   simulate(machinations_parse(f), f);
 }
 
 public void simwar()
 {
-  loc f = |project://machinations/test/simwar_v1.mach4|;
+  loc f = |project://MM-AiR/test/example/simwar_v1.mach4|;
   simulate(machinations_parse(f), f);
 }
 
 public void gen()
 {
-  loc f = |project://machinations/test/simwar_v1.mach4|;
+  loc f = |project://MM-AiR/test/example/simwar_v1.mach4|;
   generate(machinations_parse(f), f);
 }
 
 public void vis()
 {
-  loc f = |project://machinations/test/bird.mach4|;
+  loc f = |project://MM-AiR/test/example/bird.mach4|;
   visualize(machinations_parse(f), f);
 }
 
+public void prom()
+{
+  loc f = |project://MM-AiR/test/any.mach4|;
+  compile(machinations_parse(f), f);
+}
 
 
 /*

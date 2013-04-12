@@ -28,7 +28,7 @@ import lang::machinations::Preprocessor;
 import lang::machinations::Serialize;
 import lang::machinations::Message;
 
-public list[tuple[State,Transition]] machinations_simulate (Mach2 m2)
+public tuple[list[tuple[State,Transition]],list[Msg]]  machinations_simulate (Mach2 m2, int depth)
 {
   list[tuple[State,Transition]] trace = [];
   State s = NEW_State(m2);
@@ -37,32 +37,15 @@ public list[tuple[State,Transition]] machinations_simulate (Mach2 m2)
   int j = 0;
   //perform automatic random simulation
   trace = 
-  for(i <- [1..100])
+  for(i <- [1..depth])
   {
     j+=1;
     <s,tr> = simulate_step(s,ts,m2);    
-    if(i % 100 == 0) println("Step <i>");
-    append <s,tr>;
-    
+    append <s,tr>;    
     msgs = testAssertions(s,ts,m2);
-    if(msgs != [])
-    {
-      break;
-    }
+    if(msgs != []){ break; }
   }
-  
-  printTrace(trace, m2);
-  if(msgs == [])
-  {
-    println("No assertions violated in <j> steps.");
-  }
-  else
-  {
-    println("Assertion violated in <j> steps.");
-    println(toString(msgs));
-  }
-  
-  return trace;
+  return <trace, msgs>;
 }
 
 public list[Msg] testAssertions (State s, TempState ts, Mach2 m2)
@@ -74,7 +57,7 @@ public tuple[State, Transition] simulate_step(State s, TempState ts, Mach2 m2)
   set[int] active_nodes 
     = activeNodes(s, ts, m2);
 
-  println("active nodes: <active_nodes>");
+  //println("active nodes: <active_nodes>");
     
   //2: Calculate a set of conditions
   list[tuple[int, Cond]] conditions
@@ -93,7 +76,7 @@ public tuple[State, Transition] simulate_step(State s, TempState ts, Mach2 m2)
   TempState ts2 = ts; //add flow to here
   Transition tr_n;   //generated transition parts
 
-  println("begin");
+  //println("begin");
 
   //6: Solve conditions
   list[Transition] tr = [];
@@ -102,14 +85,14 @@ public tuple[State, Transition] simulate_step(State s, TempState ts, Mach2 m2)
                [a | a <- active_nodes, a notin interleaving],
      <label, cond> <- conditions)
   {
-    println("label <label> : <toString(getElement(m2,label).name)>");
+    //println("label <label> : <toString(getElement(m2,label).name)>");
     //6.1: for each condition try if it can be validated. if yes then add a flow element to the transition
     <s, ts, s2, ts2, tr_n> = solveCond(s, ts, s2, ts2, m2, label, cond);    
     //6.2: perform subtractions. NOTE: already done!
     //<s, ts> = state_sub(s, ts, m2, tr_n);
     append tr_n;
   }
-  println("end");
+  //println("end");
   
   //7: Flatten transition list  
   Transition t = [*tn | tn <- tr];

@@ -74,7 +74,7 @@ public Element getElement(Machinations m, ID name)
 //retrieve an element by name from an unflattened model
 private Element getElement(list[Element] elements, list[ID] name)
 {
-  for(e <- elements)
+  for(e <- elements, isNode(e))
   {
     if(e.name.name == head(name).name)
     {
@@ -150,7 +150,7 @@ private Exp desugarExp(list[ID] src, Exp e, list[ID] tgt)
   }
 }
 
-
+//FIXME: agree on a semantics for per
 private Element desugarPer(Machinations m, e: flow(list[ID] src, e_per(Exp exp, int n), list[ID] tgt))
 {
   ID timerId = id("<last(src).name>_timer_tick")[@location = last(src)@location];
@@ -201,7 +201,9 @@ private Element desugarPer(Machinations m, e: flow(list[ID] src, e_per(Exp exp, 
   );
 }
 
-//Flat model desugaring      
+//Flat model desugaring 
+//Converter works well
+//Delay is mostly untested, does it have the correct semantics?    
 public Machinations machinations_desugarFlat(Machinations m)
 {
   for(e: converter(When when, Act act, How how, ID name, list[Unit] opt_src_u, list[Unit] opt_tgt_u) <- m.elements)
