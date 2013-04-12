@@ -6,7 +6,7 @@
 auto source tick
 pool count
 tick --> count
-assert end : count < 20 "ok"
+assert ends : count < 20 "ok"
 
 auto push pool C at 1
 auto push pool D

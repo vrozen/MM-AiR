@@ -7,7 +7,7 @@ auto source tick
 pool count
 tick --> count
 
-assert end : count < 10 "ok"
+assert ends : count < 10 "ok"
 
 auto pool P at 1
 pool Q

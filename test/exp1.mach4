@@ -6,7 +6,7 @@
 pool A at 2
 pool B at 2 add A / 2 + 1
 
-assert end : false  "ok" //end immediately
+assert ends : false  "ok" //end immediately
 
 assert sane : ! false   "boolean not"
 assert sane : 4 != 5    "boolean not equals"
