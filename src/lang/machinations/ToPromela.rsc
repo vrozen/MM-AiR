@@ -219,21 +219,7 @@ private str prepare(Mach2 m2)
 private str finalize(Mach2 m2)
 {
   str r = "       //finalize step\n";  
-  
-  r += "       //activate when auto or user\n";
-  for(Element e <- [e | e <- m2.m.elements, isNode(e)])  
-  {
-    str n = e.name.name;
-    r += "       <n>_active = <e.when == when_auto() || e.when == when_user()>;\n";
-  }
-  r += "\n";
-  
-  //TODO: triggers
-  //for(Element e <- [e | e <- m2.getTriggers()])
-  //{
-  //  //get the source
-  //}
-
+ 
   r += "       //store new state and clear temporary values\n";
   for(Element e <- [e | e <- m2.m.elements, isPool(e)]) //TODO: gate
   {
@@ -250,88 +236,144 @@ private str finalize(Mach2 m2)
     str n = e.name.name;
     r += "       <n>_step = true;\n";
   }
+  r += "\n"; 
+   
+  r += "       //activate when auto or user\n";
+  for(Element e <- [e | e <- m2.m.elements, isNode(e)])  
+  {
+    str n = e.name.name;
+    switch(e.when)
+    {
+      case when_auto():
+      {
+        r += "       <n>_active = true;\n";  
+      }
+      case when_user():
+      {
+        r +=
+"       if
+        :: <n>_active = true;
+        :: <n>_active = false;
+        fi;";
+      }
+    }
+  }
   r += "\n";
+  
+  //TODO: triggers
+  //for(Element e <- [e | e <- m2.getTriggers()])
+  //{
+  //  //get the source
+  //}
+
+
   
   
   return r;
 }
 
-
-private str toPromela(Mach2 m2, e: pool(when_auto(), act_pull(), how_any(),
-  id(str name), list[Unit] units, at_val(int at), Add add, Min min, max_val(max))) =    
+private str toPromela(Mach2 m2, e: pool(When when, act_pull(), how_any(),
+  id(str name), list[Unit] units, At at, Add add, Min min, max_val(max))) =    
 "       :: d_step
           {
-          <name>_step == true; //if <name> acts
-          <name>_step = false; //disable <name> from taking another step until it gets another turn
-          do
-          <for(f: flow(src,exp,tgt) <- getInflow(m2, e@l)){
-          str src_name = toString(src);
-          str tgt_name = toString(tgt);
-          str flow = toString(exp);>
-          :: flow_<e@l>_<src@l>_<tgt@l> == true; //if this flow may happen
-             flow_<e@l>_<src@l>_<tgt@l> = false; //disable it from happening more than once         
-             if
-             :: <tgt_name>_new \< <max> && <src_name>_old \> 0 && <flow> \> 0;
-                if
-                :: <src_name>_old \>= <flow>; //source contains enough for full flow
-                   if
-                   :: <tgt_name>_new + <flow> \<= <max>; //the full flow fits inside the target
-                      <src_name>_old = <src_name>_old - <flow>;
-                      <tgt_name>_new = <tgt_name>_new + <flow>;
-                      <src_name>_new = <src_name>_new - <flow>;
-                   :: else; //target has capacity for less than the full flow
-                      <src_name>_old = <src_name>_old - (<max> - <tgt_name>_new);
-                      <src_name>_new = <src_name>_new - (<max> - <tgt_name>_new);
-                      <tgt_name>_new = <max>;
-                   fi;
-                :: else; //source does not contain enough for full flow
-                   if
-                   :: <tgt_name>_new + <src_name>_old \<= <max>;
-                      <tgt_name>_new = <tgt_name>_new + <src_name>;
-                      <src_name>_new = 0;
-                      <src_name>_old = 0;
-                   :: else; //target accepts less than whatever the source can provide
-                      <src_name>_new = <src_name>_new - (<max> - <name>_new);
-                      <src_name>_old = <src_name>_old - (<max> - <name>_new);
-                      <tgt_name>_new = <max>;
-                   fi;
-                fi;
-             :: else;          
-             fi;<}>
-          :: else; //all flow guards are false
-             <for(flow(src,exp,tgt) <- getInflow(m2,e@l)){>
-             flow_<e@l>_<src@l>_<tgt@l> = true;
-             <}>
-             break;
-          od
+            <name>_step == true; //if <name> acts
+            <name>_step = false; //disable <name> from taking another step until it gets another turn
+            do
+            <for(f: flow(src,exp,tgt) <- getInflow(m2, e@l)){
+            str src_name = toString(src);
+            str tgt_name = toString(tgt);
+            str flow = toString(exp);>
+            :: flow_<e@l>_<src@l>_<tgt@l> == true; //if this flow happens
+               flow_<e@l>_<src@l>_<tgt@l> = false; //disable it from happening more than once         
+               if
+               :: <tgt_name>_new \< <max> && <src_name>_old \> 0 && <flow> \> 0;
+                  if
+                  :: <src_name>_old \>= <flow>; //source contains enough for full flow
+                     if
+                     :: <tgt_name>_new + <flow> \<= <max>; //the full flow fits inside the target
+                        <src_name>_old = <src_name>_old - <flow>;
+                        <tgt_name>_new = <tgt_name>_new + <flow>;
+                        <src_name>_new = <src_name>_new - <flow>;
+                     :: else; //target has capacity for less than the full flow
+                        <src_name>_old = <src_name>_old - (<max> - <tgt_name>_new);
+                        <src_name>_new = <src_name>_new - (<max> - <tgt_name>_new);
+                        <tgt_name>_new = <max>;
+                     fi;
+                  :: else; //source does not contain enough for full flow
+                     if
+                     :: <tgt_name>_new + <src_name>_old \<= <max>;
+                        <tgt_name>_new = <tgt_name>_new + <src_name>;
+                        <src_name>_new = 0;
+                        <src_name>_old = 0;
+                     :: else; //target accepts less than whatever the source can provide
+                        <src_name>_new = <src_name>_new - (<max> - <name>_new);
+                        <src_name>_old = <src_name>_old - (<max> - <name>_new);
+                        <tgt_name>_new = <max>;
+                     fi;
+                  fi;
+               :: else;          
+               fi;<}>
+            :: else; //all flow guards are false, renable the transition
+               <for(flow(src,exp,tgt) <- getInflow(m2,e@l)){>
+               flow_<e@l>_<src@l>_<tgt@l> = true;
+               <}>
+               break;
+            od
+          };\n";
+
+private str toPromela(Mach2 m2, e: pool(When when, act_pull(), how_all(),
+  id(str name), list[Unit] units, At at, Add add, Min min, max_val(max))) =    
+"       :: d_step
+          {
+            <name>_step == true; //if <name> acts
+            <name>_step = false; //disable <name> from taking another step until it gets another turn
+            bool commit = true;
+            <for(f: flow(src,exp,tgt) <- getInflow(m2, e@l)){
+            str src_name = toString(src);
+            str tgt_name = toString(tgt);>
+            int <src_name>_new_try = <src_name>_new;
+            int <tgt_name>_new_try = <tgt_name>_new;
+            int <src_name>_old_try = <src_name>_old;
+            int <tgt_name>_old_try = <tgt_name>_old;
+            <}>
+            do
+            <for(f: flow(src,exp,tgt) <- getInflow(m2, e@l)){
+            str src_name = toString(src);
+            str tgt_name = toString(tgt);
+            str flow = toString(exp);>
+            :: flow_<e@l>_<src@l>_<tgt@l> == true; //if this flow may happen
+               flow_<e@l>_<src@l>_<tgt@l> = false; //disable it from happening more than once         
+               if
+               :: <tgt_name>_new_try \< <max> && <src_name>_old_try \> 0 && <flow> \> 0 &&
+                  <src_name>_old_try \>= <flow> && <tgt_name>_new_try + <flow> \<= <max>;
+                  //source contains enough for full flow
+                  //the full flow fits inside the target
+                  <src_name>_old_try = <src_name>_old_try - <flow>;
+                  <tgt_name>_new_try = <tgt_name>_new_try + <flow>;
+                  <src_name>_new_try = <src_name>_new_try - <flow>;
+               :: else;  //roll-back transaction
+                  commit = false;
+                  break;
+               fi;<}>
+            :: else;  //all flow guards are false
+               break; //done (commit = true)
+            od;
+            if
+            :: commit == true;
+               <for(f: flow(src,exp,tgt) <- getInflow(m2, e@l)){
+               str src_name = toString(src);
+               str tgt_name = toString(tgt);>
+               <src_name>_new = <src_name>_new_try;
+               <tgt_name>_new = <tgt_name>_new_try;
+               <src_name>_old = <src_name>_old_try;
+               <tgt_name>_old = <tgt_name>_old_try;
+               <}>
+            :: else; //do not commit
+            fi;
+            //re-enable the transition
+            <for(flow(src,exp,tgt) <- getInflow(m2,e@l)){>
+            flow_<e@l>_<src@l>_<tgt@l> = true;
+            <}>
           };\n";
 
 private str toPromela(Mach2 m2, Element e) = "";
-
-/*
-private str toPromela(p: pool(when_user(), act_pull(), how_any(),
-  id(str name), list[Unit] units, at_val(int v), Add add, Min min, Max max))
-{
-  //emit pool value
-  //emit temp pool value
-  //emit step flag, init value true
-}
-
-private str toPromela(p: pool(when_passive(), act_pull(), how_any(),
-  id(str name), list[Unit] units, at_val(int v), Add add, Min min, Max max))
-{
-  //emit pool value
-  //emit temp pool value
-  //emit step flag, init value false
-
-}
-
-private str toPromela(p: pool(when_start(), act_pull(), how_any(),
-  id(str name), list[Unit] units, at_val(int v), Add add, Min min, Max max))
-{
-  //emit pool value
-  //emit temp pool value
-  //emit step flag, init value true
-
-}
-*/
