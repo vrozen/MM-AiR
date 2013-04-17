@@ -193,7 +193,9 @@ active proctype mm ()
 <finalize(m2)>
      };
   od;
-}";
+}
+<monitor(m2,ts)>"
+;
 
 private str prepare(Mach2 m2)
 {
@@ -272,9 +274,25 @@ private str finalize(Mach2 m2)
   return r;
 }
 
+public str monitor(m2,ts)
+{
+  str r =
+"
+  active proctype monitor()
+  {
+    do<for(always(ID name, Exp exp, str msg) <- m2.m.elements){>
+    :: assert(<toString(exp)>) //<msg><}>
+    od
+  }
+";
+  return r;
+}
+
+//Note: A flow from a drain is an error --\> checker
+//Note: A flow to a source is an error --\> checker
 private str toPromela(Mach2 m2, e: pool(When when, act_pull(), how_any(),
   id(str name), list[Unit] units, At at, Add add, Min min, max_val(max))) =    
-"       :: d_step
+"       :: d_step //<toString(e)>
           {
             <name>_step == true; //if <name> acts
             <name>_step = false; //disable <name> from taking another step until it gets another turn
@@ -282,35 +300,59 @@ private str toPromela(Mach2 m2, e: pool(When when, act_pull(), how_any(),
             <for(f: flow(src,exp,tgt) <- getInflow(m2, e@l)){
             str src_name = toString(src);
             str tgt_name = toString(tgt);
-            str flow = toString(exp);>
+            str flow = toString(exp);
+            int src_label = src@l;
+            int tgt_label = tgt@l;
+            bool srcIsPool = isPool(m2,src_label);
+            bool tgtIsPool = isPool(m2,tgt_label);>            
             :: flow_<e@l>_<src@l>_<tgt@l> == true; //if this flow happens
                flow_<e@l>_<src@l>_<tgt@l> = false; //disable it from happening more than once         
                if
-               :: <tgt_name>_new \< <max> && <src_name>_old \> 0 && <flow> \> 0;
-                  if
+               :: <flow> \> 0
+                  <if(tgtIsPool){>&& <tgt_name>_new \< <max> /*target is a Pool (not a Drain)*/<}>
+                  <if(srcIsPool){>&& <src_name>_old \> 0     /*source is a Pool (not a Source)*/<}>;
+                  <if(srcIsPool){>
+                  if //source is a Pool (not a Source)
                   :: <src_name>_old \>= <flow>; //source contains enough for full flow
-                     if
+                  <}>
+                     <if(tgtIsPool){> 
+                     if //target is not a Drain
                      :: <tgt_name>_new + <flow> \<= <max>; //the full flow fits inside the target
-                        <src_name>_old = <src_name>_old - <flow>;
-                        <tgt_name>_new = <tgt_name>_new + <flow>;
-                        <src_name>_new = <src_name>_new - <flow>;
+                     <}>
+                     <if(srcIsPool){>
+                        <src_name>_old = <src_name>_old - <flow>; //remove flow from source pool
+                        <src_name>_new = <src_name>_new - <flow>; //remove flow from source pool
+                     <}>
+                     <if(tgtIsPool){>
+                        <tgt_name>_new = <tgt_name>_new + <flow>; //add flow to target pool
+                     <}>
+                     <if(tgtIsPool){> 
                      :: else; //target has capacity for less than the full flow
+                        <if(srcIsPool){>
                         <src_name>_old = <src_name>_old - (<max> - <tgt_name>_new);
                         <src_name>_new = <src_name>_new - (<max> - <tgt_name>_new);
+                        <}>
                         <tgt_name>_new = <max>;
                      fi;
-                  :: else; //source does not contain enough for full flow
+                     <}>
+                  <if(srcIsPool){>
+                  :: else; //source is a Pool (not a Source) and does not contain enough for full flow
+                     <if(tgtIsPool){>
                      if
                      :: <tgt_name>_new + <src_name>_old \<= <max>;
                         <tgt_name>_new = <tgt_name>_new + <src_name>;
+                     <}>
                         <src_name>_new = 0;
                         <src_name>_old = 0;
+                     <if(tgtIsPool){>
                      :: else; //target accepts less than whatever the source can provide
                         <src_name>_new = <src_name>_new - (<max> - <name>_new);
                         <src_name>_old = <src_name>_old - (<max> - <name>_new);
                         <tgt_name>_new = <max>;
                      fi;
+                     <}>
                   fi;
+                  <}>
                :: else;          
                fi;<}>
             :: else; //all flow guards are false, renable the transition
@@ -323,7 +365,7 @@ private str toPromela(Mach2 m2, e: pool(When when, act_pull(), how_any(),
 
 private str toPromela(Mach2 m2, e: pool(When when, act_pull(), how_all(),
   id(str name), list[Unit] units, At at, Add add, Min min, max_val(max))) =    
-"       :: d_step
+"       :: d_step //<toString(e)>
           {
             <name>_step == true; //if <name> acts
             <name>_step = false; //disable <name> from taking another step until it gets another turn
@@ -376,4 +418,4 @@ private str toPromela(Mach2 m2, e: pool(When when, act_pull(), how_all(),
             <}>
           };\n";
 
-private str toPromela(Mach2 m2, Element e) = "";
+private str toPromela(Mach2 m2, Element e) = "//no alternative emitted for: <toString(e)>";

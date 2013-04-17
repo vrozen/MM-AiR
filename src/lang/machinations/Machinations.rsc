@@ -210,7 +210,7 @@ public void vis()
 
 public void prom()
 {
-  loc f = |project://MM-AiR/test/any.mach4|;
+  loc f = |project://MM-AiR/test/all.mach4|;
   compile(machinations_parse(f), f);
 }
 
