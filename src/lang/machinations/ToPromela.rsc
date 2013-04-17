@@ -87,7 +87,6 @@ private str globals(Mach2 m2, map[str,str] ts)
     globals += "<ts[n]> <n> = <v>;\n";
   }
   
-  
   //TODO: Gates
 
   globals += "\n//node activation state\n";
@@ -177,37 +176,30 @@ private str locals(Mach2 m2, map[str,str] ts)
 //       when all step guards become false break
 
 private str promelaModel(Mach2 m2, map[str,str] ts) =
-"<globals(m2,ts)>
-active proctype mm ()
-{
-<locals(m2, ts)>
-  do
-  :: atomic
-     {
- <prepare(m2)>
-       do
-<for(Element e <- m2.m.elements, isNode(e)){><toPromela(m2,e)><}>
-       :: else;
-          break;  
-       od;
-<finalize(m2)>
-     };
-  od;
-}
-<monitor(m2,ts)>"
-;
+  "<globals(m2,ts)>
+  'active proctype mm ()
+  '{
+  '<locals(m2, ts)>
+  '  do
+  '  :: atomic
+  '     {
+  ' <prepare(m2)>
+  '       do
+  '<for(Element e <- m2.m.elements, isNode(e)){><toPromela(m2,e)><}>
+  '       :: else;
+  '          break;  
+  '       od;
+  '<finalize(m2)>
+  '     };
+  '  od;
+  '}
+  '<monitor(m2,ts)>";
 
-private str prepare(Mach2 m2)
-{
-  str r = "       //copy state to tempstate\n";
-  for(Element e <- [e | e <- m2.m.elements, isPool(e)]) //TODO: gate
-  {
-    str n = e.name.name;
-    r += "       <n>_new = <n>;\n";
-    r += "       <n>_old = <n>;\n";
-  }
-  return r;
-}  
+private str prepare(Mach2 m2) =
+ "       //copy state to tempstate<for(Element e <- [e | e <- m2.m.elements, isPool(e)]) { str n = e.name.name;> //TODO: gate
+ '       <n>_new = <n>;
+ '       <n>_old = <n>;
+ <}>";
 
 //3.3    at the end of each atomic step
 //3.3.1  propagate what is accumulated in gates according to the round robing scheduling (TODO)
@@ -268,31 +260,23 @@ private str finalize(Mach2 m2)
   //  //get the source
   //}
 
-
-  
-  
   return r;
 }
 
-public str monitor(m2,ts)
-{
-  str r =
-"
-  active proctype monitor()
-  {
-    do<for(always(ID name, Exp exp, str msg) <- m2.m.elements){>
-    :: assert(<toString(exp)>) //<msg><}>
-    od
-  }
-";
-  return r;
-}
+public str monitor(m2,ts) =
+  "  active proctype monitor()
+  '  {
+  '    do<for(always(ID name, Exp exp, str msg) <- m2.m.elements){>
+  '    :: assert(<toString(exp)>) //<msg><}>
+  '    od
+  '  }";
 
 //Note: A flow from a drain is an error --\> checker
 //Note: A flow to a source is an error --\> checker
 private str toPromela(Mach2 m2, e: pool(When when, act_pull(), how_any(),
   id(str name), list[Unit] units, At at, Add add, Min min, max_val(max))) =    
-"       :: d_step //<toString(e)>
+"
+'       :: d_step //<toString(e)>
           {
             <name>_step == true; //if <name> acts
             <name>_step = false; //disable <name> from taking another step until it gets another turn
