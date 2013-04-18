@@ -273,7 +273,7 @@ private str finalize(Mach2 m2)
   r += "       //re-enable steps:\n";
   for(Element e <- [e | e <- m2.m.elements, isNode(e)])  
   {
-    if(e.when == when_auto || canBeTriggered(m2, e@l))
+    if(e.when == when_auto() || canBeTriggered(m2, e@l))
     {
       str n = e.name.name;
       r += "       <n>_step = true;\n";
