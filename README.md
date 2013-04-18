@@ -12,7 +12,7 @@ Getting Started.
 
 Usage.
 
-1. Create a file with suffix .mach for to create a new intermediate model.
+1. Create a file with suffix .mach4≈ for to create a new intermediate model.
   * See ```/src/lang/machinations/test``` for examples
   * See ```/src/lang/machinations/Syntax.rsc``` for the syntax.
 2. To visualize richt click in the code, click Machinations, click visualize.
