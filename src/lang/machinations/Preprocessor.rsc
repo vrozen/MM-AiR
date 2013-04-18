@@ -303,3 +303,9 @@ bool hasDynamics(flow(ID src, Exp exp, ID tgt))
   }
   return false;
 }
+
+public set[int] triggeredBy(Mach2 m2, int l)
+  = {e | e: state(ID s, e_trigger(), ID t) <- m2.m.elements, t@l == l};
+
+public bool canBeTriggered(Mach2 m2, int l)
+  = triggeredBy(m2,l) != {};
