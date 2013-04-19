@@ -186,31 +186,31 @@ public void registerMachinations()
 
 public void probeer()
 {
-  loc f = |project://MM-AiR/test/example/city.mach4|;
+  loc f = |project://MM-AiR/test/examples/city.mach4|;
   simulate(machinations_parse(f), f);
 }
 
 public void simwar()
 {
-  loc f = |project://MM-AiR/test/example/simwar_v1.mach4|;
+  loc f = |project://MM-AiR/test/examples/simwar_v1.mach4|;
   simulate(machinations_parse(f), f);
 }
 
 public void gen()
 {
-  loc f = |project://MM-AiR/test/example/simwar_v1.mach4|;
+  loc f = |project://MM-AiR/test/examples/simwar_v1.mach4|;
   generate(machinations_parse(f), f);
 }
 
 public void vis()
 {
-  loc f = |project://MM-AiR/test/example/bird.mach4|;
+  loc f = |project://MM-AiR/test/examples/bird.mach4|;
   visualize(machinations_parse(f), f);
 }
 
 public void prom()
 {
-  loc f = |project://MM-AiR/test/all.mach4|;
+  loc f = |project://MM-AiR/test/examples/bird.mach4|;
   compile(machinations_parse(f), f);
 }
 

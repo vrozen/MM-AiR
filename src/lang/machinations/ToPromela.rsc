@@ -144,6 +144,9 @@ private str locals(Mach2 m2, map[str,str] ts)
   }
   locals += "\n"; 
   
+  locals += "  //commit all guard\n";
+  locals += "  bool commit = true\n;";
+  
   locals += "  //temporary old pool values for testing availability of resources:\n";
   for(Element e <- [e | e <- m2.m.elements, isPool(e)])
   {
@@ -157,6 +160,15 @@ private str locals(Mach2 m2, map[str,str] ts)
   {  
     str n = e.name.name;
     locals += "  <ts[n]> <n>_new = 0;\n";    
+  }  
+  locals += "\n";
+
+  locals += "  //temporary new pool values for testing maximum and contructing next state:\n";
+  for(Element e <- [e | e <- m2.m.elements, isPool(e)])
+  {  
+    str n = e.name.name;
+    locals += "  <ts[n]> <n>_old_try = 0;\n";    
+    locals += "  <ts[n]> <n>_new_try = 0;\n";
   }  
   locals += "\n";
 
@@ -213,8 +225,9 @@ private str promelaModel(Mach2 m2, map[str,str] ts) =
   '{
   '<locals(m2, ts)>
   '  do
-  '  :: atomic //each active or activated, non-disabled node can act
-  '     {
+  '  :: //atomic //each active or activated, non-disabled node can act
+  '     //{
+  '       printf(\"MM: step\\n\");
   '<prepare(m2)>
   '       do
   '<for(Element e <- m2.m.elements, isNode(e))
@@ -225,11 +238,13 @@ private str promelaModel(Mach2 m2, map[str,str] ts) =
   '       :: else -\> break;  
   '       od;
   '<finalize(m2)>
-  '     };
+  '     //};
   '  od;
   '}
   '
-  '<monitor(m2,ts)>";
+  '<monitor(m2,ts)>
+  ";//
+  
 
 private str prepare(Mach2 m2) = //TODO: gate
  "       //copy state to tempstate<for(Element e <- [e | e <- m2.m.elements, isPool(e)]) { str n = e.name.name;> 
@@ -257,6 +272,8 @@ private str finalize(Mach2 m2)
     r += "       <n> = <n>_new;\n";
     r += "       <n>_new = 0;\n";
     r += "       <n>_old = 0;\n";
+    r += "       <n>_new_try = 0;\n";
+    r += "       <n>_old_try = 0;\n";
   }
   r += "\n";  
   
@@ -317,6 +334,7 @@ public str monitor(m2,ts) =
   '{
   '  do<for(always(ID name, Exp exp, str msg) <- m2.m.elements){>
   '  :: !(<toString(exp)>) -\>
+  '     printf(\"MM: violate(<toString(name)>)\\n\");
   '     assert(<toString(exp)>); //<msg><}>
   '  od;
   '}";
@@ -327,8 +345,8 @@ private str toPromela(Mach2 m2, Element e, act_pull(), how_any())
 {
   str name = e.name.name;
   return
-    "       :: d_step //pull any <name>
-    '          {
+    "       :: //d_step //pull any <name>
+    '          //{
     '            <name>_step == true; //if <name> acts
     '            <name>_step = false; //disable <name> from taking another step until it gets another turn
     '            do
@@ -340,7 +358,7 @@ private str toPromela(Mach2 m2, Element e, act_pull(), how_any())
     '               <}>
     '               break;
     '            od;
-    '          };\n";
+    '          //};\n";
 }
 
 //pull all pool is a deterministic step
@@ -348,44 +366,49 @@ private str toPromela(Mach2 m2, Element e, act_pull(), how_all())
 {
   str name = e.name.name;
   return
-    "       :: d_step //pull all <name> 
-    '          {
+    "       :: //d_step //pull all <name> 
+    '          //{
     '            <name>_step == true; //if <name> acts
     '            <name>_step = false; //disable <name> from taking another step until it gets another turn
-    '            bool commit = true;<
-    for(f: flow(src,exp,tgt) <- getInflow(m2, e@l))
-                 {
-                 str src_name = toString(src);
-                 str tgt_name = toString(tgt);>
-    '            int <src_name>_new_try = <src_name>_new;
-    '            int <tgt_name>_new_try = <tgt_name>_new;
-    '            int <src_name>_old_try = <src_name>_old;
-    '            int <tgt_name>_old_try = <tgt_name>_old;<
+    '            commit = true;<
+                 for(f: flow(src,exp,tgt) <- getInflow(m2, e@l)){
+                   str src_name = toString(src);
+                   str tgt_name = toString(tgt);><
+                   if(isPool(m2, src@l)){>
+    '              <src_name>_new_try = <src_name>_new;
+    '              <src_name>_old_try = <src_name>_old;<
+                   }><
+                   if(isPool(m2, tgt@l)){>
+    '              <tgt_name>_new_try = <tgt_name>_new;
+    '              <tgt_name>_old_try = <tgt_name>_old;<
+                   }><
                  }>
     '            do<
                  for(f: flow(src,exp,tgt) <- getInflow(m2, e@l)){>
-                 '<toPromela(m2, e@l, f, how_all())><
-                 }>
+                   '<toPromela(m2, e@l, f, how_all())><}>
     '            :: else;  //all flow guards are false
     '               break; //done (commit = true)
     '            od;
     '            if
     '            :: commit == true;<
-                    for(f: flow(src,exp,tgt) <- getInflow(m2, e@l)){
+                 for(f: flow(src,exp,tgt) <- getInflow(m2, e@l)){
                     str src_name = toString(src);
-                    str tgt_name = toString(tgt);>
+                    str tgt_name = toString(tgt);
+                    str flow = toString(exp);>
+    '               printf(\"MM: flow(<src_name>,%d,<tgt_name>)\\n\",<flow>);<
+                    if(isPool(m2,src@l)){>
     '               <src_name>_new = <src_name>_new_try;
+    '               <src_name>_old = <src_name>_old_try;<}><
+                    if(isPool(m2,tgt@l)){>
     '               <tgt_name>_new = <tgt_name>_new_try;
-    '               <src_name>_old = <src_name>_old_try;
-    '               <tgt_name>_old = <tgt_name>_old_try;
-    '               <}>
+    '               <tgt_name>_old = <tgt_name>_old_try;<}><
+                 }>
     '            :: else; //do not commit
     '            fi;
     '            //re-enable the transition
     '            <for(flow(src,exp,tgt) <- getInflow(m2,e@l)){>
-    '            flow_<e@l>_<src@l>_<tgt@l> = true;
-    '            <}>
-    '          };\n";
+    '            flow_<e@l>_<src@l>_<tgt@l> = true;<}>
+    '          //};\n";
 }
 
 //push any pool is not a deterministic step
@@ -393,44 +416,51 @@ private str toPromela(Mach2 m2, Element e, act_push(), how_all())
 {
   str name = e.name.name;
   return 
-  "       :: atomic //push all <name>
-  '          {
+  "       :: //push all <name>
   '            <name>_step == true; //if <name> acts
   '            <name>_step = false; //disable <name> from taking another step until it gets another turn
-  '            bool commit = true;<
-               for(f: flow(src,exp,tgt) <- getOutflow(m2, e@l))
-               {
-               str src_name = toString(src);
-               str tgt_name = toString(tgt);>
-  '            int <src_name>_new_try = <src_name>_new;
-  '            int <tgt_name>_new_try = <tgt_name>_new;
-  '            int <src_name>_old_try = <src_name>_old;
-  '            int <tgt_name>_old_try = <tgt_name>_old;<
+  '            commit = true;<
+               for(f: flow(src,exp,tgt) <- getOutflow(m2, e@l)){
+                 str src_name = toString(src);
+                 str tgt_name = toString(tgt);><
+                 if(isPool(m2, src@l)){>
+  '              <src_name>_new_try = <src_name>_new;
+  '              <src_name>_old_try = <src_name>_old;<
+                 }><
+                 if(isPool(m2, tgt@l)){>
+  '              <tgt_name>_new_try = <tgt_name>_new;
+  '              <tgt_name>_old_try = <tgt_name>_old;<
+                 }><
                }>
   '            do<
                for(f: flow(src,exp,tgt) <- getOutflow(m2, e@l)){>
-  '            <toPromela(m2, e@l, f, how_all())><
+                 '<toPromela(m2, e@l, f, how_all())><
                }>
-  '            :: else;  //all flow guards are false
+  '            :: else -\>  //all flow guards are false
   '               break; //done (commit = true)
   '            od;
   '            if
-  '            :: commit == true;<
+  '            :: commit == true -\><
                   for(f: flow(src,exp,tgt) <- getOutflow(m2, e@l)){
-                  str src_name = toString(src);
-                  str tgt_name = toString(tgt);>
+                    str src_name = toString(src);
+                    str tgt_name = toString(tgt);
+                    str flow = toString(exp);>
+  '               printf(\"MM: flow(<src_name>,%d,<tgt_name>)\\n\",<flow>);<
+                    if(isPool(m2, src@l)){>                    
   '               <src_name>_new = <src_name>_new_try;
+  '               <src_name>_old = <src_name>_old_try;<
+                    }><
+                    if(isPool(m2, tgt@l)){>
   '               <tgt_name>_new = <tgt_name>_new_try;
-  '               <src_name>_old = <src_name>_old_try;
-  '               <tgt_name>_old = <tgt_name>_old_try;
-  '               <}>
-  '            :: else; //do not commit
+  '               <tgt_name>_old = <tgt_name>_old_try;<
+                    }><
+                  }>
+  '            :: else; commit = true; //do not commit
   '            fi;
   '            //re-enable the transition
   '            <for(flow(src,exp,tgt) <- getOutflow(m2,e@l)){>
   '            flow_<e@l>_<src@l>_<tgt@l> = true;
-  '            <}>
-  '          };\n";
+  '            <}>";
 }
 
 private str toPromela(Mach2 m2, Element e, act_push(), how_any())
@@ -451,6 +481,7 @@ private str toPromela(Mach2 m2, int l, e: flow(ID src, Exp exp, ID tgt), how_all
   if(tgtIsPool)
   {
     Element e = getElement(m2, tgt@l);
+    println(toString(e));
     max = e.max.v;
   }
   
@@ -464,7 +495,7 @@ private str toPromela(Mach2 m2, int l, e: flow(ID src, Exp exp, ID tgt), how_all
     '                  <if(srcIsPool){><src_name>_old_try = <src_name>_old_try - <flow>;<}>
     '                  <if(tgtIsPool){><tgt_name>_new_try = <tgt_name>_new_try + <flow>;<}>
     '                  <if(srcIsPool){><src_name>_new_try = <src_name>_new_try - <flow>;<}>
-    '               :: else;  //roll-back transaction
+    '               :: else -\>  //roll-back transaction
     '                  commit = false;
     '                  break;
     '               fi;";
@@ -484,7 +515,7 @@ private str toPromela(Mach2 m2, int l, e: flow(ID src, Exp exp, ID tgt), how_any
     Element e = getElement(m2, tgt@l);
     max = e.max.v;
   }
-    
+  
   return
     "            :: flow_<l>_<src@l>_<tgt@l> == true; //if this flow happens
     '               flow_<l>_<src@l>_<tgt@l> = false; //disable it from happening more than once         
@@ -500,7 +531,8 @@ private str toPromela(Mach2 m2, int l, e: flow(ID src, Exp exp, ID tgt), how_any
                        {> 
     '                     if //target <tgt_name> is a Pool (not a Drain)
     '                     :: <tgt_name>_new + <flow> \<= <max>; //the full flow fits inside the target<
-                       }><
+                       }>
+    '                        printf(\"MM: flow(<src_name>,%d,<tgt_name>)\\n\",<flow>);<
                        if(srcIsPool){>
     '                        <src_name>_old = <src_name>_old - <flow>; //remove flow from source pool
     '                        <src_name>_new = <src_name>_new - <flow>; //remove flow from source pool
@@ -516,6 +548,7 @@ private str toPromela(Mach2 m2, int l, e: flow(ID src, Exp exp, ID tgt), how_any
     '                        <src_name>_old = <src_name>_old - (<max> - <tgt_name>_new);
     '                        <src_name>_new = <src_name>_new - (<max> - <tgt_name>_new);<
                            }>
+    '                        printf(\"MM: flow(<src_name>,%d,<tgt_name>)\\n\",(<max> - <tgt_name>_new));
     '                        <tgt_name>_new = <max>;
     '                     fi;<
                        }>
@@ -526,12 +559,14 @@ private str toPromela(Mach2 m2, int l, e: flow(ID src, Exp exp, ID tgt), how_any
     '                     :: <tgt_name>_new + <src_name>_old \<= <max>;
     '                        <tgt_name>_new = <tgt_name>_new + <src_name>;
     '                     <}>
+    '                        printf(\"MM: flow(<src_name>,%d,<tgt_name>)\",<src_name>_old);
     '                        <src_name>_new = 0;
     '                        <src_name>_old = 0;
     '                     <if(tgtIsPool){>
     '                     :: else; //target accepts less than whatever the source can provide
-    '                        <src_name>_new = <src_name>_new - (<max> - <name>_new);
-    '                        <src_name>_old = <src_name>_old - (<max> - <name>_new);
+    '                        printf(\"MM: flow(<src_name>,%d,<tgt_name>)\\n\",(<max> - <src_name>_new));
+    '                        <src_name>_old = <src_name>_old - (<max> - <src_name>_new);
+    '                        <src_name>_new = <src_name>_new - (<max> - <src_name>_new);
     '                        <tgt_name>_new = <max>;
     '                     fi;
     '                     <}>
