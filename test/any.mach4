@@ -1,5 +1,5 @@
 source steps
-auto pool count
+auto pool count max 3
 steps --> count
 assert ends : count < 2 "ok"
 
