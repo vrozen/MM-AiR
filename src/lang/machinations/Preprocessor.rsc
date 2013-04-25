@@ -110,35 +110,30 @@ public void printTrace(list[tuple[State,Transition]] trace, Mach2 m2)
   }
 }
 
-public str toString(State s, Mach2 m2)
-{
-  str r = "--[State]---------------------------------------\n";
-  TempState ts = NEW_TempState(m2);
-  r += "  Pools:";
-  for(l <- [0..size(s.pools)]) //FIXME off by one
-  {
-    r += "\t<toString(getElement(m2,l).name)>\t: <state_retrieve(s, ts, m2, l)>\n";
-  }
-  r += "  Activated:";
-  for(l <- s.activated) //FIXME off by one
-  {
-    r += "\t<toString(getElement(m2,l).name)>\n";
-  }
-  return r;
-}
+public str toString(State s, Mach2 m2) =
+  "--[State]---------------------------------------
+  '  Pools:<for(l <- [0..size(s.pools)]){>
+  '    <toString(getElement(m2,l).name)>\t: <state_retrieve(s, NEW_TempState(m2), m2, l)><}>
+  '  Activated:<for(l <- activeNodes(s, NEW_TempState(m2), m2)){>
+  '    <toString(getElement(m2,l).name)><}>";
+
+public str toString(Transition t, Mach2 m2) =
+  "--[Transition]----------------------------------<for(<src,f,tgt> <- t){>
+  '  <toString(getElement(m2,src).name)>\t-<f>-\>\t<toString(getElement(m2,tgt).name)><}>";
+  
+public str toString(list[tuple[State,Transition]] trace, Mach2 m2) =
+  "<for(<s,t> <- trace){>
+  '<toString(t, m2)>
+  '<toString(s, m2)><}>";
 
 public void printState(State s, Mach2 m2)
 {
-  print(toString(s,m2));  
+  println(toString(s,m2));  
 }
 
 public void printTransition(Transition t, Mach2 m2)
 {
-  println("--[Transition]----------------------------------");
-  for(<src,f,tgt> <- t)
-  {
-    println("\t<toString(getElement(m2,src).name)>\t-<f>-\>\t<toString(getElement(m2,tgt).name)>");
-  }
+  println(toString(t,m2));
 }
 
 public Mach2 machinations_preprocess(Machinations m)
