@@ -101,7 +101,13 @@ public void simulate(Tree t, loc l)
   else
   {
     Mach2 m6 = machinations_preprocess(m5);
-    machinations_simulate(m6);
+    <trace, msgs> = machinations_simulate(m6, 100);
+   
+    println(toString(trace, m6));
+    if(msgs!=[])
+    {
+      println("Errors:\n<toString(msgs)>");
+    }
   }
 }
 
@@ -186,7 +192,7 @@ public void registerMachinations()
 
 public void probeer()
 {
-  loc f = |project://MM-AiR/test/examples/city.mach4|;
+  loc f = |project://MM-AiR/test/activator2.mach4|;
   simulate(machinations_parse(f), f);
 }
 
