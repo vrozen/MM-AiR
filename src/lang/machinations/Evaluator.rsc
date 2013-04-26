@@ -30,6 +30,8 @@ import lang::machinations::Message;
 
 public tuple[list[tuple[State,Transition]],list[Msg]]  machinations_simulate (Mach2 m2, int depth)
 {
+  println("Random simulation to maximum depth <depth> started.\n");
+
   list[tuple[State,Transition]] trace = [];
   State s = NEW_State(m2);
   TempState ts = NEW_TempState(m2);
@@ -646,14 +648,13 @@ private tuple[State, TempState, Transition] redistributeGate
 
       //store the value in the state
       <s, ts> = state_add(s, ts, m2, [t]);
-      
+
       if(isGate(m2, tgt) == true)
       {
         //redistribute this gate also
-        Element gate2 = getElement(m2, tgt);
-        list[Element] flows2 = outFlow(m2, tgt);
-        <s, ts, tr> = redistributeGate (s, ts, tr, m2, gate2, flows2);
+        <s, ts, tr> = redistributeGate (s, ts, tr, m2, tgt, getOutflow(m2, tgt));
       }
+       
     }
     else //it does not fit
     {
@@ -686,9 +687,9 @@ private tuple[State, TempState, Transition] redistributeGate
       if(isGate(m2, tgt) == true)
       {
         //redistribute this gate also
-        Element gate2 = getElement(m2, tgt);
-        list[Element] flows2 = outFlow(m2, tgt);
-        <s, ts, tr> = redistributeGate (s, ts, tr, m2, gate2, flows2);
+        //Element gate2 = getElement(m2, tgt);
+        //list[Element] flows2 = getOutflow(m2, tgt);
+        <s, ts, tr> = redistributeGate (s, ts, tr, m2, tgt, getOutflow(m2, tgt));
       }
                   
       //try to redistribute this gate again
