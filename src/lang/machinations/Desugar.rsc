@@ -23,6 +23,17 @@ import IO;
 import List;
 import util::Math;
 
+public Machinations machinations_limit(Machinations m, int max)
+{
+  return visit(m)
+  {
+    case max_none():
+    {
+      insert max_val(max);
+    }
+  }
+}
+
 public Machinations machinations_desugar (Machinations m)
 {
   return visit(m)

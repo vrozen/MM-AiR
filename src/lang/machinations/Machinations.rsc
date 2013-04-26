@@ -135,10 +135,12 @@ public void compile(Tree t, loc l)
 {
   Machinations m1 = machinations_implode(t); 
   Machinations m2 = machinations_desugar(m1);
-  <m3, msgs3> = machinations_flatten(m2);
-  Machinations m4 = machinations_desugarFlat(m3);
-  <m5, msgs5> = machinations_label(m4);
-  msgs = msgs3 + msgs5;
+  Machinations m3 = machinations_limit(m2, 255);
+  
+  <m4, msgs4> = machinations_flatten(m3);
+  Machinations m5 = machinations_desugarFlat(m4);
+  <m6, msgs6> = machinations_label(m5);
+  msgs = msgs4 + msgs6;
   println(toString(msgs));
   if(msgs != [])
   {
@@ -146,8 +148,8 @@ public void compile(Tree t, loc l)
   }
   else
   {
-    Mach2 m6 = machinations_preprocess(m5);
-    str promelaModel = machinations_toPromela(m6);
+    Mach2 m7 = machinations_preprocess(m6);
+    str promelaModel = machinations_toPromela(m7);
     println("\n\n\n\n//promela model:\n<promelaModel>\n\n");    
   }
 }
@@ -192,7 +194,7 @@ public void registerMachinations()
 
 public void probeer()
 {
-  loc f = |project://MM-AiR/test/activator2.mach4|;
+  loc f = |project://MM-AiR/test/all.mach4|;
   simulate(machinations_parse(f), f);
 }
 
