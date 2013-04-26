@@ -1,7 +1,6 @@
 /*
   This test demonstrates that gates must have at
   least one output that is guaranteed to be enabled.
-  Note: the test should fail in the contextual analyzer. How to check this?
  */
 source S
 auto gate G
