@@ -77,31 +77,13 @@ private str EXPLORE_MODE = "Explore State Space";
 private str GUIDED_MODE = "Guided Simulation";
 
 //------------------------------------------------------------------------------
-//External API: machinations_visualize
+//External API: mm_visualize
 //------------------------------------------------------------------------------
 
-public void machinations_visualize(Tree t, loc l)
+public void mm_visualize(Mach2 m2)
 {
-  //----------------------------------------------------------------------------
-  //TODO: Move this to another function
-  //---------------------------------------------------------------------------- 
-  Machinations m_1 = machinations_implode(t); 
-  Machinations m_2 = machinations_desugar(m_1);
-  Machinations m_3;
-  list[Msg] msg_3;
-  <m_3, msgs_3> = machinations_flatten(m_2);
-  Machinations m_4 = machinations_desugarFlat(m_3);
-  Machinations m_5;
-  list[Msg] msg_5;
-  <m_5, msgs_5> = machinations_label(m_4);
-  list[Msg] msgs = msgs_3 + msgs_5;
-  if(msgs != [])
-  {
-    println("Errors:\n<toString(msgs)>");
-    return;
-  }
-  Mach2 m2 = machinations_preprocess(m_5);
-
+  list[Msg] msgs = [];
+  
   //----------------------------------------------------------------------------
   //Locals used in the visualization.
   //----------------------------------------------------------------------------  
