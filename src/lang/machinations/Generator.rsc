@@ -29,7 +29,7 @@ import lang::machinations::Serialize;
 import lang::machinations::Message;
 import lang::machinations::Evaluator;
 
-public set[State] machinations_generate (Mach2 m2)
+public set[State] mm_generate (Mach2 m2)
 {
   State s = NEW_State(m2);
   TempState ts = NEW_TempState(m2);
