@@ -5,14 +5,14 @@
   This ensures that both pools always contain the same amount of resources.
 */
 
-auto source tick
-pool count
+source tick
+auto pool count
 tick --> count
 
 source S
 auto gate G
-auto pool A
-auto pool B
+pool A
+pool B
 S -4-> G
 G --> A
 G --> B

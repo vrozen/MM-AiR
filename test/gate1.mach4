@@ -3,10 +3,10 @@
   Every step G pulls a resource from A and distributes it back.
 */
 
-auto source tick
-pool count
+source tick
+auto pool count
 tick --> count
-assert ends : count < 100 "ok"
+assert ends : count < 10 "ok"
 
 pool A at 1
 auto gate G
