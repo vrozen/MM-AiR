@@ -19,6 +19,17 @@
 module lang::machinations::Syntax
 
 /******************************************************************************** 
+  Micro Machinations Traces
+********************************************************************************/
+start syntax Trace
+  = trace: Event*;
+
+syntax Event
+  = evt_step: "MM:" "step"
+  | evt_flow: "MM:" NID "-" VALUE "-" "\>" NID
+  | evt_fail: "MM:" "violate" NID;
+
+/******************************************************************************** 
   Notes on changes and adjustments.
   Flow had name such that state edges (flow modifier edges) could adjust it.
   This is removed since the flow expression expresses the same thing.
@@ -198,8 +209,8 @@ keyword Keyword
   | "true" | "false" | "dice" | "active"
   | "ref" | "in" | "out" | "inout";
   
-public start[Machinations] machinations_parse(str src, loc file) = 
+public start[Machinations] mm_parse(str src, loc file) = 
   parse(#start[Machinations], src, file);
   
-public start[Machinations] machinations_parse(loc file) = 
+public start[Machinations] mm_parse(loc file) = 
   parse(#start[Machinations], file);
