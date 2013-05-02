@@ -23,18 +23,7 @@ import IO;
 import List;
 import util::Math;
 
-public Machinations machinations_limit(Machinations m, int max)
-{
-  return visit(m)
-  {
-    case max_none():
-    {
-      insert max_val(max);
-    }
-  }
-}
-
-public Machinations machinations_desugar (Machinations m)
+public Machinations mm_desugar (Machinations m)
 {
   return visit(m)
   {
@@ -215,7 +204,7 @@ private Element desugarPer(Machinations m, e: flow(list[ID] src, e_per(Exp exp, 
 //Flat model desugaring 
 //Converter works well
 //Delay is mostly untested, does it have the correct semantics?    
-public Machinations machinations_desugarFlat(Machinations m)
+public Machinations mm_desugarFlat(Machinations m)
 {
   for(e: converter(When when, Act act, How how, ID name, list[Unit] opt_src_u, list[Unit] opt_tgt_u) <- m.elements)
   {
