@@ -30,6 +30,17 @@ import List;
 import Set;
 import util::Math;
 
+public Mach2 mm_limit(Mach2 m2, int max)
+{
+  return visit(m2)
+  {
+    case max_none():
+    {
+      insert max_val(max);
+    }
+  }
+}
+
 public Element getElement(Mach2 m2, int l)
   = m2.elements[l];
 
@@ -136,7 +147,7 @@ public void printTransition(Transition t, Mach2 m2)
   println(toString(t,m2));
 }
 
-public Mach2 machinations_preprocess(Machinations m)
+public Mach2 mm_preprocess(Machinations m)
 {
   Mach2 m2 = NEW_Mach2;  
   m2.m = m;
