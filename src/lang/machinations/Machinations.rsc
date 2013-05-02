@@ -38,123 +38,238 @@ import vis::Figure;
 import IO;
 import Message;
 
-//data OL = outl(list[str] errs);
-
 private str Machinations_NAME = "Machinations"; //language name
 private str Machinations_EXT = "mach4";         //file extension
 
-private Tree machinations_check(Tree t)
+public tuple[Machinations, list[Msg]] mm_parse (Tree t, loc l)
 {
-  //Machinations m = machinations_implode(t);
-  //list[Msg] msgs;
-  //list[Message] errors;  
-  //<m, mi> = setLabels(m);
-  //<msgs, mf> = getFlow(m, mi);
-  //msgs += check(m, mi, mf);
+  list[Msg] msgs = [];
+  list[Msg] msgs1, msgs2, msgs3, msgs4, msgs5;
+  Machinations m1, m2, m3, m4, m5;
+ 
+  //println("2. Implode");
+  try
+  {
+    m1 = mm_implode(t); 
+  }
+  catch e:
+  {
+    msgs += [msg_ImploderFail(l, toString(e))];
+    return <mach([]), msgs>;
+  }
+  
+  //println("3. Desugar");
+  try
+  {
+    m2 = mm_desugar(m1);
+  }
+  catch e:
+  {
+    msg += [msgs_DesugarFail(l, toString(e))];
+    return <mach([]), msgs>;
+  }
+  
+  //println("4. Flatten");
+  try
+  {
+    <m3, msgs3> = mm_flatten(m2);
+    if(msgs3 != [])
+    { 
+      throw msgs3;
+    }
+  }
+  catch e:
+  {
+    msgs += [msg_FlattenerFail(l, toString(e))];
+    return <mach([]), msgs>;
+  }
+  
+  //println("5. Desugar Flat");
+  try
+  {
+    m4 = mm_desugarFlat(m3);
+  }
+  catch e:
+  {
+    msgs += [msg_DesugarFail(l,toString(e))];
+    return <mach([]), msgs4>;
+  }
+  
+  //println("6. Label");
+  try
+  {
+    <m5, msgs5> = mm_label(m4);
+    if(msgs5 != [])
+    {
+      throw msgs5;
+    }
+  }
+  catch e:
+  {
+    msgs += [labelerFail(l,toString(e))]; 
+    return <mach([]), msgs>;
+  }
 
-  //errors = getErrors(msgs);
-  //uses = getUses(m, mi);
-  //defs = getDefs(uses);
-  
-  //t = setLink(t, uses);
-  //t = setLinks(t, defs);
-  
-  //return t[@messages = errors];
-  return t;
+  return <m5, msgs>;
 }
 
-private node machinations_outline(Tree t)
-  = machinations_implode(t);
-
-private void flatten(Tree t, loc l)
+public tuple[Mach2, list[Msg]] mm_preprocess (Tree t, loc l)
 {
-  Machinations m1 = machinations_implode(t); 
-  Machinations m2 = machinations_desugar(m1);
-  //println("desugared:\n<toString(m2)>\n");
-  <m3, msgs> = machinations_flatten(m2);
-  Machinations m4 = machinations_desugarFlat(m3);
-  println("/*Flattened model <l>*/\n<toString(m4)>\n");
+  list[Msg] msgs = [];
+  Machinations m;
+  Mach2 m2;
+  <m, msgs> = mm_parse(t, l);  
+  if(msgs != [])
+  {
+    return <m, msgs>;
+  }
+  
+  //println("7. Preprocess\n");
+  try
+  {
+    m2 = mm_preprocess(m);
+  }
+  catch e:
+  {
+    msgs += [msg_PreprocessorFail(l,toString(e))];
+    return <m2, msgs>;
+  }
+  
+  return <m2, msgs>;
+}
+
+public tuple[Mach2, list[Msg]] mm_limit (Tree t, loc l)
+{
+  list[Msg] msgs = [];
+  Mach2 m2, m3;
+  <m2, msgs> = mm_preprocess(t, l);
+  if(msgs != [])
+  {
+    return <m, msgs>;
+  }
+  
+  //println("8. Limit\n");
+  try
+  {
+    m3 = mm_limit(m2, 255);
+  }
+  catch e:
+  {
+    msgs += [msg_LimiterFail(l,toString(e))];
+    return <m2, msgs>;
+  }
+  
+  return <m3, msgs>;
+}
+
+public tuple[Mach2, list[tuple[State,Transition]], list[Msg]] mm_simulate (Tree t, loc l, int depth)
+{
+  list[Msg] msgs, msgs2;
+  Mach2 m2;
+  list[tuple[State,Transition]] trace = [];
+  <m2, msgs> = mm_limit(t, l);
+  
+  if(msgs != [])
+  {
+    return <m, msgs>;
+  } 
+
+  //println("8. Simulate");
+  try
+  {
+    <trace, msgs2> = mm_simulate(m2, depth);
+    if([msg_AssertionViolated(State s, Element e)] := msgs2 &&
+       e.name.name == "ends")
+    {
+      ;
+    }
+    else if(msgs2 != [])
+    {      
+      throw msgs2;
+    }
+  }
+  catch e:
+  {
+    msgs += [msg_EvaluatorFail(l, toString(e))];
+  }
+  
+  return <m2, trace, msgs>; 
+}
+
+private node mm_ide_outline (Tree t)
+  = mm_implode(t);
+
+private void mm_ide_flatten (Tree t, loc l)
+{
+  Machinations m;
+  list[Msg] msgs;
+  <m, msgs> = phase1(t, l);  
+  println("/*Flattened model <l>*/\n<toString(m)>\n");
   if(msgs!=[])
   {
     println("Errors:\n<toString(msgs)>");
   }
 }
 
-private void visualize(Tree t, loc l)
+private void mm_ide_visualize (Tree t, loc l)
 {
-  machinations_visualize(t,l);
-}
-
-public void simulate(Tree t, loc l)
-{
-  Machinations m1 = machinations_implode(t); 
-  Machinations m2 = machinations_desugar(m1);
-  <m3, msgs3> = machinations_flatten(m2);
-  Machinations m4 = machinations_desugarFlat(m3);
-  <m5, msgs5> = machinations_label(m4);
-  println(toString(m5));  
-  msgs = msgs3 + msgs5;
+  list[Msg] msgs;
+  Mach2 m2;  
+  <m2, msgs> = mm_limit(t, l);
   if(msgs != [])
   {
-    println("Errors:\n<toString(msgs)>");
+    println(toString(msgs));
   }
   else
   {
-    Mach2 m6 = machinations_preprocess(m5);
-    <trace, msgs> = machinations_simulate(m6, 100);
+    mm_visualize(m2);
+  }
+}
+
+public void mm_ide_simulate (Tree t, loc l)
+{
+  list[Msg] msgs;
+  Mach2 m2;
+  list[tuple[State,Transition]] trace;    
+  <m2, trace, msgs> = mm_simulate(t, l, 100);
    
-    println(toString(trace, m6));
-    if(msgs!=[])
-    {
-      println("Errors:\n<toString(msgs)>");
-    }
-  }
-}
-
-public void generate(Tree t, loc l)
-{
-  Machinations m1 = machinations_implode(t); 
-  Machinations m2 = machinations_desugar(m1);
-  <m3, msgs3> = machinations_flatten(m2);
-  Machinations m4 = machinations_desugarFlat(m3);
-  <m5, msgs5> = machinations_label(m4);
-  msgs = msgs3 + msgs5;
-  println(toString(msgs));
-  if(msgs != [])
+  println(toString(trace, m2));
+  if(msgs!=[])
   {
     println("Errors:\n<toString(msgs)>");
   }
-  else
-  {
-    Mach2 m6 = machinations_preprocess(m5);
-    machinations_generate(m6);
-  }
 }
 
-public void compile(Tree t, loc l)
+public void mm_ide_generate (Tree t, loc l)
 {
-  Machinations m1 = machinations_implode(t); 
-  Machinations m2 = machinations_desugar(m1);
-  Machinations m3 = machinations_limit(m2, 255);
+  list[Msg] msgs, msgs2;
+  Mach2 m2;
+  list[tuple[State,Transition]] trace = [];
+  <m2, msgs> = mm_limit(t, l);
   
-  <m4, msgs4> = machinations_flatten(m3);
-  Machinations m5 = machinations_desugarFlat(m4);
-  <m6, msgs6> = machinations_label(m5);
-  msgs = msgs4 + msgs6;
-  println(toString(msgs));
   if(msgs != [])
+  {
+    return <m, msgs>;
+  } 
+
+  //println("8. Generate");
+  mm_generate(m2);
+}
+
+public void mm_ide_compile (Tree t, loc l)
+{
+  list[Msg] msgs;
+  str model;
+  <model, msgs> = mm_toPromela(m7);
+      
+  println("\n\n\n\n//promela model:\n<model>\n\n");
+  if(msgs!=[])
   {
     println("Errors:\n<toString(msgs)>");
   }
-  else
-  {
-    Mach2 m7 = machinations_preprocess(m6);
-    str promelaModel = machinations_toPromela(m7);
-    println("\n\n\n\n//promela model:\n<promelaModel>\n\n");    
-  }
 }
 
-public void registerMachinations()
+public void mm_register()
 {
   c =
   {
@@ -176,52 +291,54 @@ public void registerMachinations()
       (
         "Machinations",
         [
-          action("flatten", flatten),
-          action("simulate", simulate),
-          action("generate", generate),
-          action("visualize", visualize),
-          action("toPromela", compile)
+          action("flatten", mm_ide_flatten),
+          action("simulate", mm_ide_simulate),
+          action("generate", mm_ide_generate),
+          action("visualize", mm_ide_visualize),
+          action("toPromela", mm_ide_compile)
         ]
       )
     )
   };
     
-  registerLanguage(Machinations_NAME, Machinations_EXT, machinations_parse);
+  registerLanguage(Machinations_NAME, Machinations_EXT, lang::machinations::Syntax::mm_parse);
   //registerAnnotator(Machinations_NAME, machinations_check);
-  registerOutliner(Machinations_NAME, machinations_outline);
+  registerOutliner(Machinations_NAME, mm_ide_outline);
   registerContributions(Machinations_NAME, c);
 }
 
+//--------------------------------------------------------------------------------
+//for quick testing purposes
+//--------------------------------------------------------------------------------
 public void probeer()
 {
   loc f = |project://MM-AiR/test/all.mach4|;
-  simulate(machinations_parse(f), f);
+  mm_ide_simulate(mm_parse(f), f);
 }
 
 public void simwar()
 {
   loc f = |project://MM-AiR/test/examples/simwar_v1.mach4|;
-  simulate(machinations_parse(f), f);
+  mm_ide_simulate(mm_parse(f), f);
 }
 
 public void gen()
 {
   loc f = |project://MM-AiR/test/examples/simwar_v1.mach4|;
-  generate(machinations_parse(f), f);
+  mm_ide_generate(mm_parse(f), f);
 }
 
 public void vis()
 {
   loc f = |project://MM-AiR/test/examples/bird.mach4|;
-  visualize(machinations_parse(f), f);
+  mm_ide_visualize(mm_parse(f), f);
 }
 
 public void prom()
 {
-  loc f = |project://MM-AiR/test/examples/bird.mach4|;
-  compile(machinations_parse(f), f);
+  loc f = |project://MM-AiR/test/source.mach4|;
+  mm_ide_compile(mm_parse(f), f);
 }
-
 
 /*
 private Tree machinations_setLink(Tree t, map[loc, loc] l)
@@ -262,3 +379,24 @@ private Tree machinations_setLinks(Tree t, map[loc, set[loc]] l)
     }
   }
 }*/
+
+
+private Tree mm_ide_check(Tree t)
+{
+  //Machinations m = machinations_implode(t);
+  //list[Msg] msgs;
+  //list[Message] errors;  
+  //<m, mi> = setLabels(m);
+  //<msgs, mf> = getFlow(m, mi);
+  //msgs += check(m, mi, mf);
+
+  //errors = getErrors(msgs);
+  //uses = getUses(m, mi);
+  //defs = getDefs(uses);
+  
+  //t = setLink(t, uses);
+  //t = setLinks(t, defs);
+  
+  //return t[@messages = errors];
+  return t;
+}
