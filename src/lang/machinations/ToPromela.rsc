@@ -31,8 +31,7 @@ private int MAX_BIT   = 1;
 private int MAX_BYTE  = 255;
 private int MAX_SHORT = toInt(pow(2, 15)) - 1;
 
-
-public str machinations_toPromela(Mach2 m2)
+public str mm_toPromela(Mach2 m2)
  = promelaModel(m2,storageTypes(m2));
 
 private map[str,str] storageTypes(Mach2 m2)
@@ -96,7 +95,7 @@ private str globals(Mach2 m2, map[str,str] ts)
   for(Element e <- [e | e <- m2.m.elements, isGate(e)])
   {
     str n = e.name.name;
-    globals += "int <n>; //label <e@l>\n";
+    globals += "int <n> = 0; //label <e@l>\n";
     globals += "byte <n>_s = 0; //label <e@l>\n"; //gate edge number
     globals += "int <n>_c = 0;  //label <e@l>\n"; //gate edge count
   }
@@ -128,27 +127,15 @@ private str locals(Mach2 m2, map[str,str] ts)
   for(Element e <- [e | e <- m2.m.elements, isNode(e)])  
   {
     //if it is automatic or can be triggered
-    if(e.when == when_auto() || canBeTriggered(m2,e@l))
+    if(e.when == when_auto() || e.when == when_user() || canBeTriggered(m2,e@l))
     {   
       str n = e.name.name;
-      locals += "  bool <n>_step = true;\n";
+      locals += "  bool <n>_step;\n"; //initialized later
     }
   }
-  locals += "\n";
-
-  locals += "  //temporary gate values";
-  for(Element e <- [e | e <- m2.m.elements, isGate(e)])
-  {
-    //if it has inflow
-    if(getInflow(m2, e@l) != [])
-    {
-      str n = e.name.name;
-      locals += "  int <n> = 0;\n"; //must be zero before and after each step
-    }
-  }
-  locals += "\n"; 
+  locals += "\n";  
   
-  locals += "  bool commit = true; //commit all guard\\n";
+  locals += "  bool commit = true; //commit all guard\n";
   
   locals += "  //temporary old pool values for testing availability of resources:\n";
   for(Element e <- [e | e <- m2.m.elements, isPool(e)])
@@ -180,7 +167,7 @@ private str locals(Mach2 m2, map[str,str] ts)
   {
     //if it is automatic or can be triggered
     Element e = getElement(m2,l);
-    if(e.when == when_auto() || canBeTriggered(m2,l))
+    if(e.when == when_auto() || e.when == when_user() || canBeTriggered(m2,l))
     {
       for(flow(src,exp,tgt) <- getInflow(m2,l))
       {
@@ -195,7 +182,7 @@ private str locals(Mach2 m2, map[str,str] ts)
   {
     //if it is automatic or can be triggered
     Element e = getElement(m2,l);
-    if(e.when == when_auto() || canBeTriggered(m2,l))
+    if(e.when == when_auto() || e.when == when_user() || canBeTriggered(m2,l))
     {
       for(flow(src,exp,tgt) <- getOutflow(m2,l))
       {
@@ -228,8 +215,8 @@ private str promelaModel(Mach2 m2, map[str,str] ts) =
   '{
   '<locals(m2, ts)>
   '  do
-  '  :: //atomic //each active or activated, non-disabled node can act
-  '     //{
+  '  :: atomic //each active or activated, non-disabled node can act
+  '     {
   '       printf(\"MM: step\\n\");
   '<prepare(m2)>
   '       do
@@ -241,7 +228,7 @@ private str promelaModel(Mach2 m2, map[str,str] ts) =
   '       :: else -\> break;  
   '       od;
   '<finalize(m2)>
-  '     //};
+  '     };
   '  od;
   '}
   '
@@ -249,11 +236,22 @@ private str promelaModel(Mach2 m2, map[str,str] ts) =
   ";//
   
 
-private str prepare(Mach2 m2) = //TODO: gate
+private str prepare(Mach2 m2) =
  "       //copy state to tempstate<for(Element e <- [e | e <- m2.m.elements, isPool(e)]) { str n = e.name.name;> 
  '       <n>_new = <n>;
  '       <n>_old = <n>;
- <}>";
+ <}>
+ '       //enable steps:<
+   for(Element e <- [e | e <- m2.m.elements, isNode(e)]){><
+     if(e.when == when_auto() || canBeTriggered(m2, e@l)){ str n = e.name.name; >
+ '       if
+ '       :: <n>_active == true <for(state(ID s, Exp e, ID t) <- getActivators(m2, e@l)){>&& <toString(e)><}> -\> <n>_step = true;
+ '       :: else;
+ '       fi;<
+     }><
+   }>
+ '     
+ ";
 
 //3.3    at the end of each atomic step
 //3.3.1  propagate what is accumulated in gates according to the round robing scheduling (TODO)
@@ -267,21 +265,82 @@ private str prepare(Mach2 m2) = //TODO: gate
 private str finalize(Mach2 m2)
 {
   str r = "       //finalize step\n";  
+
+  r += "       //activate via triggers\n";
+  //for each node that has triggers
+  //   if each flow is satisfied
+  //   then the flow along each edge on which the node operates is greater or equal to the flow expression
+  //   then activate the nodes the trigger refers to
+
+  for(int l <- getPullNodes(m2))
+  {
+    list[Element] ts = getTriggers(m2,l);
+    if(ts != [])
+    {
+      //get the inflow      
+      r += "       if\n";
+      r += "       :: ";
+      for(flow(ID s, Exp exp, ID t) <- getInflow(m2,l))
+      {
+        r += "flow_<s@l>_<t@l> \>= <toString(exp)> && ";
+      }
+      r += "true -\>\n";
+      for(state(ID s, Exp exp, ID t) <- ts)
+      {
+        r += "        <t.name>_active = true;";
+      }
+      r += "\n";
+      r += "       :: else;\n";
+      r += "       fi;\n";
+    }
+  }
+  
+  for(int l <- getPushNodes(m2))
+  {
+    list[Element] ts = getTriggers(m2,l);     
+    if(ts != [])
+    {
+      //get the inflow      
+      r += "       if\n";
+      r += "       :: ";
+      for(flow(ID s, Exp exp, ID t) <- getOutflow(m2,l))
+      {
+        r += "flow_<s@l>_<t@l> \>= <toString(exp)> && ";
+      }
+      r += "true -\> ";
+      for(state(ID s, Exp exp, ID t) <- ts)
+      {
+        r += "<t.name>_active = true; ";
+      }
+      r += "\n";
+      r += "       :: else;\n";
+      r += "       fi;\n";
+    }
+  }
+  r += "\n";
+  
+  r += "       //clear temporary transition data from state\n";
+  for(Element e <- [e | e <- m2.m.elements, isFlow(e)])
+  {
+    r += "       flow_<e.s@l>_<e.t@l> = 0;\n";
+  }
+  r += "\n";
  
   r += "       //store new state and clear temporary values\n";
   for(Element e <- [e | e <- m2.m.elements, isPool(e)]) 
   {
     str n = e.name.name;
-    r += "       <n> = <n>_new;\n";
-    r += "       <n>_new = 0;\n";
-    r += "       <n>_old = 0;\n";
-    r += "       <n>_new_try = 0;\n";
-    r += "       <n>_old_try = 0;\n";
+    r += "       <n> = <n>_new;
+         '       <n>_new = 0;
+         '       <n>_old = 0;
+         '       <n>_new_try = 0;
+         '       <n>_old_try = 0;\n";
   }
-  r += "\n";  
+  r += "\n";
 
-  r += redistribute(m2);
+  r += redistribute(m2) + "\n";
   
+  /*
   r += "       //re-enable steps:\n";
   for(Element e <- [e | e <- m2.m.elements, isNode(e)])  
   {
@@ -291,8 +350,8 @@ private str finalize(Mach2 m2)
       r += "       <n>_step = true;\n";
     }
   }
-  r += "\n"; 
-   
+  r += "\n";*/
+  
   r += "       //activate when auto or user\n";
   for(Element e <- [e | e <- m2.m.elements, isNode(e)])  
   {
@@ -306,21 +365,14 @@ private str finalize(Mach2 m2)
       case when_user():
       {
         r +=
-"       if
-        :: <n>_active = true;
-        :: <n>_active = false;
-        fi;";
+        "       if
+        '       :: <n>_active = true;
+        '       :: <n>_active = false;
+        '       fi;";
       }
     }
   }
   r += "\n";
-  
-  //TODO: triggers
-  //for(Element e <- [e | e <- m2.getTriggers()])
-  //{
-  //  //get the source
-  //}
-
   return r;
 }
 
@@ -335,12 +387,12 @@ public str monitor(m2,ts) =
   '}";
 
 private str redistribute(Mach2 m2) =
-  "  \\redistribute gates
-  '  do<for(e <- m2.m.elements, isGate(e)){>
-  '<redistribute(m2,e)><}>
-  '  :: else -\> //all gates have redistributed         
-  '     break;   //exit redistribution phase
-  '  od";
+  "       //redistribute gates
+  '       do<for(e <- m2.m.elements, isGate(e)){>
+  '       <redistribute(m2,e)><}>
+  '       :: else -\> //all gates have redistributed         
+  '          break;   //exit redistribution phase
+  '       od;";
 
 //implement round-robin scheduling of gates
 private str redistribute(Mach2 m2, g: gate(When when, Act act, How how, ID n, list[Unit] opt_u))
@@ -374,26 +426,30 @@ private str redistribute(Mach2 m2, g: gate(When when, Act act, How how, ID n, li
                  if
                  :: <tgtName> + (<flow> - <name>_c) \<= <max>; //if the full flow fits into the target
                  <}>                 
+                    printf(\"MM: flow(<name>,%d,<tgtName>)\\n\",(<flow>));
                     <tgtName> = <tgtName> + (<flow> - <name>_c); //add the flow to the target
                     <name> = <name> - (<flow> - <name>_c); //remove the flow from the gate
                  <if(tgtIsPool){>
                  :: else -\> ; //the target has capacity for less than the full flow
+                    printf(\"MM: flow(<name>,%d,<tgtName>)\\n\",(<max> - <tgtName>));
                     <name> = <name> - (<max> - <tgtName>); //remove the target remaining capacity from the gate
                     <tgtName> = <max>; //max out the target
                  fi;
                  <}>
-                 <if(selected == size(fs)){><name>_s = <name>_s + 1; <} else {><name>_s = 0;<}> //select the next edge
+                 <if(selected < size(fs) - 1){><name>_s = <name>_s + 1; <} else {><name>_s = 0;<}> //select the next edge
                  <name>_c = 0; //reset count
               :: else -\> //the full flow is not available  
                  <if(tgtIsPool){>             
                  if
                  :: <name> \< (<max> - <tgtName>) -\> //if whatever is available fits into the target
                  <}>
+                    printf(\"MM: flow(<name>,%d,<tgtName>)\\n\",(<name>));
                     <tgtName> = <tgtName> + <name>; //add what is available to the target
                     <name>_c = <name>_c + <name>; //add what flows to the count
                     <name> = 0; //empty the gate
                  <if(tgtIsPool){>                
                  :: else -\> //whatever is available does not fit the target
+                    printf(\"MM: flow(<name>,%d,<tgtName>)\\n\",(<max> - <tgtName>));
                     <name> = <name> - (<max> - <tgtName>); //remove the target remaining capacity from the gate
                     <name>_c = <name>_c + (<max> - <tgtName>); //add what flows to the count
                     <tgtName> = <max>; //max out the target                 
@@ -401,7 +457,7 @@ private str redistribute(Mach2 m2, g: gate(When when, Act act, How how, ID n, li
                  <}>
               fi;
             :: else -\> //the target is full and fits nothing else or the flow is not positive           
-               <if(selected == size(fs)){><name>_s = <name>_s + 1; <} else {><name>_s = 0;<}> //select the next edge   
+               <if(selected < size(fs) - 1){><name>_s = <name>_s + 1; <} else {><name>_s = 0;<}> //select the next edge 
            fi;<}>
          fi;";
 }
@@ -461,7 +517,8 @@ private str toPromela(Mach2 m2, Element e, act_pull(), how_all())
                     str src_name = toString(src);
                     str tgt_name = toString(tgt);
                     str flow = toString(exp);>
-    '               printf(\"MM: flow(<src_name>,%d,<tgt_name>)\\n\",<flow>);<
+    '               printf(\"MM: flow(<src_name>,%d,<tgt_name>)\\n\",<flow>);
+    '               flow_<src@l>_<tgt@l> = flow_<src@l>_<tgt@l> + <flow>;<
                     if(isPool(m2,src@l)){>
     '               <src_name>_new = <src_name>_new_try;
     '               <src_name>_old = <src_name>_old_try;<}><
@@ -511,7 +568,8 @@ private str toPromela(Mach2 m2, Element e, act_push(), how_all())
                  str src_name = toString(src);
                  str tgt_name = toString(tgt);
                  str flow = toString(exp);>
-  '            printf(\"MM: flow(<src_name>,%d,<tgt_name>)\\n\",<flow>);<
+  '            printf(\"MM: flow(<src_name>,%d,<tgt_name>)\\n\",<flow>);
+  '            flow_<src@l>_<tgt@l> = flow_<src@l>_<tgt@l> + <flow>;<
                  if(isPool(m2, src@l)){>                    
   '            <src_name>_new = <src_name>_new_try;
   '            <src_name>_old = <src_name>_old_try;<
@@ -574,7 +632,8 @@ private str toPromela(Mach2 m2, int l, e: flow(ID src, Exp exp, ID tgt), how_any
   str tgt_name = toString(tgt);
   str flow = toString(exp);
   bool srcIsPool = isPool(m2,src@l);
-  bool tgtIsPool = isPool(m2,tgt@l);  
+  bool tgtIsPool = isPool(m2,tgt@l);
+  bool tgtIsGate = isGate(m2,tgt@l);  
   int max = 0;
   if(tgtIsPool)
   {
@@ -586,10 +645,10 @@ private str toPromela(Mach2 m2, int l, e: flow(ID src, Exp exp, ID tgt), how_any
     "            :: flow_<l>_<src@l>_<tgt@l> == true; //if this flow happens
     '               flow_<l>_<src@l>_<tgt@l> = false; //disable it from happening more than once         
     '               if
-    '               :: <flow> \> 0<if(tgtIsPool){>&& <tgt_name>_new \< <max> /*target <tgt_name> is a Pool (not a Drain)*/<}>
+    '               :: <flow> \> 0<if(tgtIsPool){> && <tgt_name>_new \< <max> /*target <tgt_name> is a Pool (not a Drain)*/<}>
     '                  <if(srcIsPool){>&& <src_name>_old \> 0     /*source <src_name> is a Pool (not a Source)*/<}> -\><
-                     if(srcIsPool)
-                    {>
+                       if(srcIsPool)
+                       {>
     '                  if //source is a Pool (not a Source)
     '                  :: <src_name>_old \>= <flow> -\> //source contains enough for full flow
     '                  <}><
@@ -598,7 +657,8 @@ private str toPromela(Mach2 m2, int l, e: flow(ID src, Exp exp, ID tgt), how_any
     '                     if //target <tgt_name> is a Pool (not a Drain)
     '                     :: <tgt_name>_new + <flow> \<= <max> -\> //the full flow fits inside the target<
                        }>
-    '                        printf(\"MM: flow(<src_name>,%d,<tgt_name>)\\n\",<flow>);<
+    '                        printf(\"MM: flow(<src_name>,%d,<tgt_name>)\\n\",<flow>);
+    '                        flow_<src@l>_<tgt@l> = flow_<src@l>_<tgt@l> + <flow>;<
                        if(srcIsPool){>
     '                        <src_name>_old = <src_name>_old - <flow>; //remove flow from source pool
     '                        <src_name>_new = <src_name>_new - <flow>; //remove flow from source pool
@@ -606,6 +666,10 @@ private str toPromela(Mach2 m2, int l, e: flow(ID src, Exp exp, ID tgt), how_any
                        if(tgtIsPool){>
     '                        <tgt_name>_new = <tgt_name>_new + <flow>; //add flow to target pool
     '                  <}><
+                       if(tgtIsGate){>
+                       <}>
+    '                        <tgt_name> = <tgt_name> + <flow>;
+                       <
                        if(tgtIsPool)
                        {> 
     '                     :: else; //target has capacity for less than the full flow
@@ -615,6 +679,7 @@ private str toPromela(Mach2 m2, int l, e: flow(ID src, Exp exp, ID tgt), how_any
     '                        <src_name>_new = <src_name>_new - (<max> - <tgt_name>_new);<
                            }>
     '                        printf(\"MM: flow(<src_name>,%d,<tgt_name>)\\n\",(<max> - <tgt_name>_new));
+    '                        flow_<src@l>_<tgt@l> = flow_<src@l>_<tgt@l> + (<max> - <tgt_name>_new);
     '                        <tgt_name>_new = <max>;
     '                     fi;<
                        }>
@@ -623,16 +688,18 @@ private str toPromela(Mach2 m2, int l, e: flow(ID src, Exp exp, ID tgt), how_any
     '                     <if(tgtIsPool){>
     '                     if
     '                     :: <tgt_name>_new + <src_name>_old \<= <max> -\>
-    '                        <tgt_name>_new = <tgt_name>_new + <src_name>;
+    '                        <tgt_name>_new = <tgt_name>_new + <src_name>_old;
     '                     <}>
     '                        printf(\"MM: flow(<src_name>,%d,<tgt_name>)\",<src_name>_old);
+    '                        flow_<src@l>_<tgt@l> = flow_<src@l>_<tgt@l> + <src_name>_old;
     '                        <src_name>_new = 0;
     '                        <src_name>_old = 0;
     '                     <if(tgtIsPool){>
     '                     :: else; //target accepts less than whatever the source can provide
-    '                        printf(\"MM: flow(<src_name>,%d,<tgt_name>)\\n\",(<max> - <src_name>_new));
-    '                        <src_name>_old = <src_name>_old - (<max> - <src_name>_new);
-    '                        <src_name>_new = <src_name>_new - (<max> - <src_name>_new);
+    '                        printf(\"MM: flow(<src_name>,%d,<tgt_name>)\\n\",(<max> - <tgt_name>_new));
+    '                        flow_<src@l>_<tgt@l> = flow_<src@l>_<tgt@l> + (<max> - <tgt_name>_new);
+    '                        <src_name>_old = <src_name>_old - (<max> - <tgt_name>_new);
+    '                        <src_name>_new = <src_name>_new - (<max> - <tgt_name>_new);
     '                        <tgt_name>_new = <max>;
     '                     fi;
     '                     <}>
