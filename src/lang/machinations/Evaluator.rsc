@@ -28,7 +28,7 @@ import lang::machinations::Preprocessor;
 import lang::machinations::Serialize;
 import lang::machinations::Message;
 
-public tuple[list[tuple[State,Transition]],list[Msg]]  machinations_simulate (Mach2 m2, int depth)
+public tuple[list[tuple[State,Transition]],list[Msg]]  mm_simulate (Mach2 m2, int depth)
 {
   println("Random simulation to maximum depth <depth> started.\n");
 
