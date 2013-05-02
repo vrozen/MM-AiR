@@ -21,7 +21,7 @@ module lang::machinations::Labeler
 import lang::machinations::AST;
 import lang::machinations::Message;
 
-public tuple[Machinations,list[Msg]] machinations_label (Machinations m)
+public tuple[Machinations,list[Msg]] mm_label (Machinations m)
 {
   list[Msg] msgs = [];
   map[ID,int] n2l = ();
