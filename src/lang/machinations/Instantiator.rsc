@@ -26,7 +26,7 @@ import lang::machinations::Message;
 import lang::machinations::Desugar;
 
 //flattens a machinations model
-public tuple[Machinations,list[Msg]] machinations_flatten(Machinations m)
+public tuple[Machinations,list[Msg]] mm_flatten(Machinations m)
 {
   map[str, Element] types = (n.name: t | t: ctype (n, _, _ ) <- m.elements);
   <es, msgs> = flatten(id("global scope")[@location = m@location], "", types, m.elements);
