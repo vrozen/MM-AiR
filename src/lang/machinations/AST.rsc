@@ -28,18 +28,36 @@ anno loc Exp@location;
 anno int Element@l; //label
 anno int ID@l;      //label
 
+public lang::machinations::AST::Machinations mm_implode(Tree t)
+  = implode(#lang::machinations::AST::Machinations, t);
+
+/******************************************************************************** 
+  Micro Machinations Traces
+********************************************************************************/
+data Trace
+  = trace(list[Event] events);
+
+data Event
+  = evt_step()
+  | evt_flow(ID s, int val, ID t)
+  | evt_fail(ID name);
+
+/******************************************************************************** 
+  Micro Machinations AST
+********************************************************************************/
 data Machinations
   = mach(list[Element] elements);
 //Note: A flow from a drain is an error --\> checker
 //Note: A flow to a source is an error --\> checker
+//Note: Pulling from a gate is an error --\> checker
 
 data Element
   //basic elements:
   = pool      (When when, Act act, How how, ID name, list[Unit] units, At at, Add add, Min min, Max max)
   | gate      (When when, Act act, How how, ID name, list[Unit] opt_u) //Dist removed
     //NOTE: all gates automatically push and they cannot be disabled. pull, passive or start are not supported
-  | flow      (list[ID] src, Exp exp, list[ID] tgt)
-  | state     (list[ID] src, Exp exp, list[ID] tgt)
+  | flow      (list[ID] src, Exp exp, list[ID] tgt) //flow edge
+  | state     (list[ID] src, Exp exp, list[ID] tgt) //state edge
   | always    (ID name, Exp exp, str msg)
   //syntactic sugar:
   | source    (When when, Act act, How how, ID name, list[Unit] opt_u)
@@ -49,8 +67,8 @@ data Element
   //temporary desugaring block:
   | block     (list[Element] elements)
   //flattened flow
-  | flow      (ID s, Exp exp, ID t)
-  | state     (ID s, Exp exp, ID t)
+  | flow      (ID s, Exp exp, ID t) //flow edge
+  | state     (ID s, Exp exp, ID t) //state edge
   //component elements:
   //Added: global scripting commands (breaks declarative universe)
   //1. use component to spawn and
@@ -148,9 +166,6 @@ data Exp
 data ID
   = id(str name);
  
-public lang::machinations::AST::Machinations machinations_implode(Tree t)
-  = implode(#lang::machinations::AST::Machinations, t);
-
 //boolean pattern matching on elements
 public bool isPool(Element n)
   = (pool (When when, Act act, How how, ID name, list[Unit] units, At at, Add add, Min min, Max max) := n);
