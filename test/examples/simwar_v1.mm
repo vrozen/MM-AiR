@@ -49,8 +49,8 @@ PlayerRules(in BuyAttack, in BuyFactory, in BuyDefence,
   buyAttack --> attack           //buyAttack produces 1 Attack to attack
 
   factories -all-> destroyed     //factories destuction rate
-  defence -opponent_attack * 0.25-> killed  //defence casualty rate
-  attack -opponent_defence * 0.25-> killed  //attack casualty rate
+  defence -opponent_attack /** 0.25*/-> killed  //defence casualty rate
+  attack -opponent_defence /** 0.25*/-> killed  //attack casualty rate
   defence .==0 && attack == 0.> destroyed  //zero defence enables destroyed
 }
 
@@ -58,9 +58,9 @@ Turtle(ref buyAttack, ref buyDefence, ref buyFactory)
 {
   source tick
   auto pool count
-  auto gate chooseDefence
-  auto gate chooseFactory
-  auto gate chooseAttack
+  auto drain chooseDefence
+  auto drain chooseFactory
+  auto drain chooseAttack
   tick --> count  
   tick --> chooseDefence
   tick --> chooseFactory
@@ -79,9 +79,9 @@ AntiTurtle(ref buyAttack, ref buyDefence, ref buyFactory)
 {
   source tick
   auto pool count
-  //auto gate chooseDefence
-  auto gate chooseFactory
-  auto gate chooseAttack
+  //auto drain chooseDefence
+  auto drain chooseFactory
+  auto drain chooseAttack
   tick --> count  
   //tick --> chooseDefence
   tick --> chooseFactory
