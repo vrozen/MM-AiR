@@ -2,9 +2,11 @@
   This test demonstrates delays hold resources for a specified amount of steps.
   Every step, a unit is built and building takes 5 steps.
   This ensures that defence is zero or counter minus 5.
+  
+  FIXME: it makes much more sense for edges to delay, not nodes
 */
-auto source tick
-pool count
+source tick
+auto pool count
 tick --> count
 
 auto source units
