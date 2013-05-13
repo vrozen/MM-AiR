@@ -2,8 +2,8 @@
   This test demonstrates flows that happen once every so many steps.
 */
 
-auto source tick
-pool count
+source tick
+auto pool count
 tick --> count
 
 source units

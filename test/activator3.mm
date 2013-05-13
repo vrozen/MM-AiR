@@ -1,6 +1,5 @@
-
-auto source tick
-pool count
+source tick
+auto pool count
 tick --> count
 assert ends : count < 20 "ok"
 

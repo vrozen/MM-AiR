@@ -2,12 +2,12 @@
   This test demonstrates maximum pool values.
 */
 
-auto source tick
-pool count
+source tick
+auto pool count
 tick --> count
 assert ends : count < 20 "ok"
 
-auto pool A at 20
+pool A at 20
 auto pool B max 1
 auto pool C max 5
 auto pool D

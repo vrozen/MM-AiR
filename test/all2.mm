@@ -1,6 +1,6 @@
-source steps
+source tick
 auto pool count
-steps --> count
+tick --> count
 assert ends : count < 2 "ok"
 
 auto push all pool A at 3

@@ -3,28 +3,17 @@
   but that unactivated nodes cannot trigger other nodes.
 */
 
-auto source tick
-pool count
+source tick
+auto pool count
 tick --> count
 
-assert ends : count < 10 "ok"
-
 auto pool P at 1
-pool Q
-P .*.> Q
-P --> Q
+pool P2
+P .*.> P2
+P --> P2
 
-assert trigger : count <= 2 && P == 1 || Q == 1
+assert ends : count < 10 "ok"
+assert trigger : count < 2 || P2 == 1
   "state from an active pool without inflow triggers automatically"
-assert trigger : count < 1 || active Q
+assert trigger : count < 1 || active P
   "state from an active pool without inflow triggers automatically"
-
-pool S at 1
-pool T
-S .*.> T
-S --> T
-
-assert trigger : T == 0     
-  "state from unactivated nodes does not trigger"
-assert trigger : ! active T
-  "state from unactivated nodes does not trigger"

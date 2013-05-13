@@ -1,9 +1,9 @@
-auto source tick
-pool count
+source tick
+auto pool count
 tick --> count
 assert ends : count < 20 "ok"
 
-auto source S
+auto all source S
 pool A
 pool B
 S --> A

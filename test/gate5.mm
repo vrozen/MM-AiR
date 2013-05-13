@@ -2,8 +2,8 @@
   This test demonstrates gates can distribute via other gates.
 */
 
-auto source tick
-pool count
+source tick
+auto pool count
 tick --> count
 
 pool P at 12

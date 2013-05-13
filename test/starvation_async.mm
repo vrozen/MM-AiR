@@ -1,7 +1,7 @@
 /*
   This test demonstrates starvation in asynchronous time.
 */
-auto push pool oldLady at 10
+auto push all pool oldLady at 10
 assert ends : oldLady != 0 "ok"
 
 Pond pond

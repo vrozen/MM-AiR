@@ -2,8 +2,8 @@
   This test demonstrates flows that happen once every so many steps.
 */
 
-auto source tick
-pool count
+source tick
+auto pool count
 tick --> count
 assert ends : count < 16 "ok"
 
@@ -14,7 +14,7 @@ assert ends : count < 16 "ok"
 auto pool P1 at 9
 pool P2
 
-source S
+all source S
 pool C
 drain D
 S --> C

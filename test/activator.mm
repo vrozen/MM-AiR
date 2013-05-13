@@ -2,10 +2,10 @@
   This test demonstrates pulling of resources and activators.
 */
 
-source steps
+source tick
 auto pool count
-steps --> count
-assert ends : count < 100 "ok"
+tick --> count
+assert ends : count < 20 "ok"
 
 auto pool A at 4
 auto pool B at 0

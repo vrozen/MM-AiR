@@ -5,14 +5,14 @@
   Since B starts at 1, this ensures that either A is one resource ahead, or B is.
 */
 
-auto source tick
-pool count
+source tick
+auto pool count
 tick --> count
 
 source S
 auto gate G
-auto pool A 
-auto pool B at 1
+pool A 
+pool B at 1
 S -2-> G
 G -2-> A
 G -2-> B

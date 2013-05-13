@@ -2,17 +2,17 @@
   This test demonstrates gates can trigger other nodes.
 */
 
-auto source tick
-pool count
+source tick
+auto pool count
 tick --> count
 
-source s
+all source s
 auto gate g
 pool p
 g .*.> s
 s --> p
 
-assert ends : count < 100 "ok"
+assert ends : count < 10 "ok"
 
 assert sane : count == 0 || active s "automatic gates without input can trigger other nodes"
 

@@ -1,6 +1,6 @@
-source steps
+source tick
 auto pool count max 3
-steps --> count
+tick --> count
 assert ends : count < 2 "ok"
 
 pool A at 3
