@@ -24,10 +24,20 @@ module lang::machinations::Syntax
 start syntax Trace
   = trace: Event*;
 
+//syntax Step
+//  = tr_step: Event*;
+  
 syntax Event
-  = evt_step: "MM:" "step"
-  | evt_flow: "MM:" NID "-" VALUE "-" "\>" NID
-  | evt_fail: "MM:" "violate" NID;
+  = tr_flow:    NID "-" VALUE "-" "\>" NID
+  | tr_next:    "step"
+  | tr_trigger: "trigger" NID
+  | tr_inhibit: "inhibit" NID  //NOTE: not used yet
+  | tr_signal:  "signal"  NID  //NOTE: not used yet
+  | tr_violate: "violate" NID
+  | tr_state:   "state" "(" {StateValue ","}* ")";
+  
+syntax StateValue
+  = NID "=" VALUE;
 
 /******************************************************************************** 
   Notes on changes and adjustments.
@@ -207,10 +217,18 @@ keyword Keyword
   | "passive" | "user" | "auto" | "start"
   | "push" | "pull" | "any" | "all"
   | "true" | "false" | "dice" | "active"
-  | "ref" | "in" | "out" | "inout";
+  | "ref" | "in" | "out" | "inout" |
+  | "step" | "violate";
   
 public start[Machinations] mm_parse(str src, loc file) = 
   parse(#start[Machinations], src, file);
   
 public start[Machinations] mm_parse(loc file) = 
   parse(#start[Machinations], file);
+  
+public start[Trace] mm_trace_parse(str src, loc file) = 
+  parse(#start[Trace], src, file);
+
+public start[Trace] mm_trace_parse(loc file) =
+  parse(#start[Trace], file);
+  

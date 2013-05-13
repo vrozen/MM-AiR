@@ -21,12 +21,45 @@ module lang::machinations::Labeler
 import lang::machinations::AST;
 import lang::machinations::Message;
 
+//note: requires a labeled machinations model
+public tuple[Trace, list[Msg]] mm_label (Machinations m, Trace trace)
+{
+  list[Msg] msgs = [];   //messages
+  map[ID, int] n2l = (); //name to label map
+
+  //1. build name to label map
+  visit(m)
+  {
+    case ID n:
+    {
+      n2l += (n : n@l);
+    }
+  };
+  
+  //2. annotate trace with labels
+  Trace trace2 = visit(trace)
+  {
+    case ID id:
+    {
+      if(id in n2l)
+      {
+        insert id[@l = n2l[id]];
+      }
+      //else
+      //{
+      //  msgs += [msg_MissingElement(id)];
+      //}
+    }
+  };
+  
+  return <trace2, msgs>;
+}
+
 public tuple[Machinations,list[Msg]] mm_label (Machinations m)
 {
-  list[Msg] msgs = [];
-  map[ID,int] n2l = ();
-  //map[int,Element] l2e = ();
-  int l = 0;
+  list[Msg] msgs = [];  //messages
+  map[ID,int] n2l = (); //name to label map
+  int l = 0;            //current label
   
   //First label pools
   //Note: the labels become addresses for value storage.

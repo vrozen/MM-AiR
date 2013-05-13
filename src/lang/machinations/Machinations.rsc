@@ -31,6 +31,7 @@ import lang::machinations::Generator;
 import lang::machinations::Message;
 import lang::machinations::Visualize;
 import lang::machinations::ToPromela;
+import lang::machinations::Trace;
 
 import ParseTree;
 import util::IDE;
@@ -38,8 +39,11 @@ import vis::Figure;
 import IO;
 import Message;
 
-private str Machinations_NAME = "Machinations"; //language name
-private str Machinations_EXT = "mach4";         //file extension
+public str MM_NAME = "Micro Machinations"; //language name
+public str MM_EXT  = "mm" ;                //file extension
+
+public str MM_TRACE_NAME = "Micro Machinations Trace"; //language name
+public str MM_TRACE_EXT  = "mmt";                      //file extention
 
 public tuple[Machinations, list[Msg]] mm_parse (Tree t, loc l)
 {
@@ -66,7 +70,7 @@ public tuple[Machinations, list[Msg]] mm_parse (Tree t, loc l)
   catch e:
   {
     msg += [msgs_DesugarFail(l, toString(e))];
-    return <mach([]), msgs>;
+    return <m1, msgs>;
   }
   
   //println("4. Flatten");
@@ -75,13 +79,13 @@ public tuple[Machinations, list[Msg]] mm_parse (Tree t, loc l)
     <m3, msgs3> = mm_flatten(m2);
     if(msgs3 != [])
     { 
-      throw msgs3;
+      return <m2, msgs3>;
     }
   }
   catch e:
   {
-    msgs += [msg_FlattenerFail(l, toString(e))];
-    return <mach([]), msgs>;
+    msgs += [msg_FlattenerFail(l, e)];
+    return <m2, msgs>;
   }
   
   //println("5. Desugar Flat");
@@ -101,7 +105,7 @@ public tuple[Machinations, list[Msg]] mm_parse (Tree t, loc l)
     <m5, msgs5> = mm_label(m4);
     if(msgs5 != [])
     {
-      throw msgs5;
+      return <m4, msgs5>;
     }
   }
   catch e:
@@ -121,7 +125,7 @@ public tuple[Mach2, list[Msg]] mm_preprocess (Tree t, loc l)
   <m, msgs> = mm_parse(t, l);  
   if(msgs != [])
   {
-    return <m, msgs>;
+    return <NEW_Mach2, msgs>;
   }
   
   //println("7. Preprocess\n");
@@ -145,7 +149,7 @@ public tuple[Mach2, list[Msg]] mm_limit (Tree t, loc l)
   <m2, msgs> = mm_preprocess(t, l);
   if(msgs != [])
   {
-    return <m, msgs>;
+    return <NEW_Mach2, msgs>;
   }
   
   //println("8. Limit\n");
@@ -171,7 +175,7 @@ public tuple[Mach2, list[tuple[State,Transition]], list[Msg]] mm_simulate (Tree 
   
   if(msgs != [])
   {
-    return <m, msgs>;
+    return <m2, trace, msgs>;
   } 
 
   //println("8. Simulate");
@@ -185,7 +189,7 @@ public tuple[Mach2, list[tuple[State,Transition]], list[Msg]] mm_simulate (Tree 
     }
     else if(msgs2 != [])
     {      
-      throw msgs2;
+      return <m2, trace, msgs2>;
     }
   }
   catch e:
@@ -196,33 +200,126 @@ public tuple[Mach2, list[tuple[State,Transition]], list[Msg]] mm_simulate (Tree 
   return <m2, trace, msgs>; 
 }
 
+public tuple[Mach2 m2, list[tuple[State s, Transition tr]] trace, list[Msg] msgs] mm_play(Tree t, loc mmt_loc)
+{
+  loc mm_loc = mmt_loc;
+  mm_loc.extension = "mm";  
+  
+  list[Msg] msgs = [], msgs1, msgs2, msgs3;
+  Mach2 m2;
+  Trace trace, trace2;
+  list[tuple[State,Transition]] stateTrace = [];
+  
+  <m2, msgs1> = mm_limit(mm_parse(mm_loc), mm_loc);
+  if(msgs1 != [])
+  {
+    return <m2, [], msgs1>;
+  }
+  
+  try
+  {
+    trace = mm_trace_implode(t);  
+  }
+  catch e:
+  {
+    msgs += [msg_ImploderFail(m2, toString(e))];
+    return <m2, [], msgs>;
+  }
+  
+  try
+  {
+    trace = mm_trace_transform(trace);
+  }
+  catch e:
+  {
+    msgs += [msg_LabelerFail(m2, e)];
+  }
+  
+  
+  try
+  {
+    <trace2, msgs2> = mm_label(m2.m, trace);
+    if(msgs2 != [])
+    {
+      return <m2, trace, msgs2>;
+    }
+  }
+  catch e:
+  {
+    msgs += [msg_LabelerFail(m2, toString(e))];
+    return <m2, [], msgs>;
+  }
+  
+  try
+  {
+    <stateTrace, msgs3> = mm_play(m2, trace2);
+    if([msg_AssertionViolated(State s, Element e)] := msgs3 &&
+       e.name.name == "ends")
+    {
+      ;
+    }
+    else if(msgs3 != [])
+    {      
+      return <m2, [], msgs3>;
+    }
+  }
+  catch e:
+  {
+    msgs += [msg_EvaluatorFail(mmt_loc, e)];
+  }
+  
+  return <m2, stateTrace, msgs>;
+}
+
+
+public tuple[str,list[Msg]] mm_toPromela(Tree t, loc l)
+{
+  tuple[Mach2 m2, list[Msg] msgs] phase1 = mm_limit(t, l);
+  tuple[str model, list[Msg] msgs] result = <"", phase1.msgs>;
+  
+  if(phase1.msgs == [])
+  {
+    result.model = mm_toPromela(phase1.m2);
+  }
+
+  return result;
+}
+
+//--------------------------------------------------------------------------------
+//IDE functions
+//--------------------------------------------------------------------------------
 private node mm_ide_outline (Tree t)
   = mm_implode(t);
 
+private node mm_trace_ide_outline(Tree t)
+  = mm_trace_implode(t);
+
+private void mm_trace_ide_parse(Tree t, loc l)
+{
+  Trace trace = mm_trace_implode(t);
+  iprintln(trace);
+}
+
 private void mm_ide_flatten (Tree t, loc l)
 {
-  Machinations m;
-  list[Msg] msgs;
-  <m, msgs> = phase1(t, l);  
-  println("/*Flattened model <l>*/\n<toString(m)>\n");
-  if(msgs!=[])
+  tuple[Machinations m, list[Msg] msgs] phase1 = mm_parse(t, l);  
+  println("/*Flattened model <l>*/\n<toString(phase1.m)>\n");
+  if(phase1.msgs!=[])
   {
-    println("Errors:\n<toString(msgs)>");
+    println("Errors:\n<toString(phase1.msgs)>");
   }
 }
 
 private void mm_ide_visualize (Tree t, loc l)
 {
-  list[Msg] msgs;
-  Mach2 m2;  
-  <m2, msgs> = mm_limit(t, l);
-  if(msgs != [])
+  tuple[Mach2 m2, list[Msg] msgs] phase1 = mm_limit(t, l);
+  if(phase1.msgs != [])
   {
-    println(toString(msgs));
+    println(toString(phase1.msgs));
   }
   else
   {
-    mm_visualize(m2);
+    mm_visualize(phase1.m2);
   }
 }
 
@@ -242,37 +339,53 @@ public void mm_ide_simulate (Tree t, loc l)
 
 public void mm_ide_generate (Tree t, loc l)
 {
-  list[Msg] msgs, msgs2;
-  Mach2 m2;
-  list[tuple[State,Transition]] trace = [];
-  <m2, msgs> = mm_limit(t, l);
-  
-  if(msgs != [])
-  {
-    return <m, msgs>;
-  } 
-
-  //println("8. Generate");
-  mm_generate(m2);
+  println("FIXME: TODO");
 }
 
-public void mm_ide_compile (Tree t, loc l)
+public void mm_ide_toPromela (Tree t, loc l)
 {
-  list[Msg] msgs;
-  str model;
-  <model, msgs> = mm_toPromela(m7);
-      
-  println("\n\n\n\n//promela model:\n<model>\n\n");
-  if(msgs!=[])
+  println("Compile file <l> to Promela.");
+  tuple[str model, list[Msg] msgs] phase1 = mm_toPromela(t, l);
+  list[Msg] msgs = phase1.msgs;
+ 
+  if(msgs == [])
   {
-    println("Errors:\n<toString(msgs)>");
+    loc pml_loc = l;
+    pml_loc.extension = "pml";
+    try
+    {
+      println("Writing file <pml_loc>");
+      writeFile(pml_loc, phase1.model);
+    }
+    catch e:
+    {
+      msgs += [msg_ToPromelaFail(l,e)];
+    }
+  }
+  
+  if(phase1.msgs != [])
+  {
+    println("Errors:\n<toString(phase1.msgs)>");
+  }
+}
+
+public void mm_trace_ide_play (Tree t, loc mmt_loc)
+{
+  tuple[Mach2 m2, list[tuple[State s, Transition tr]] trace, list[Msg] msgs] phase1 = mm_play(t, mmt_loc);
+  if(phase1.msgs != [])
+  {
+    println("Errors:\n<toString(phase1.msgs)>");
+  }
+  else
+  {
+    println(toString(phase1.trace, phase1.m2));
+    println("Playback completed successfuly.");
   }
 }
 
 public void mm_register()
 {
-  c =
-  {
+  Contribution mm_style =
     categories
     (
       (
@@ -284,27 +397,51 @@ public void mm_register()
         "String": {foregroundColor(color("teal"))}
         //,"MetaKeyword": {foregroundColor(color("blueviolet")), bold()}
       )
-    ),
+    );
+
+  set[Contribution] mm_contributions =
+  {
+    mm_style,
     popup
     (
       menu
       (
-        "Machinations",
+        "Micro-Machinations",
         [
-          action("flatten", mm_ide_flatten),
-          action("simulate", mm_ide_simulate),
-          action("generate", mm_ide_generate),
-          action("visualize", mm_ide_visualize),
-          action("toPromela", mm_ide_compile)
+          action("Flatten", mm_ide_flatten),
+          action("Simulate", mm_ide_simulate),
+          action("Generate", mm_ide_generate),
+          action("Visualize", mm_ide_visualize),
+          action("ToPromela", mm_ide_toPromela)
+        ]
+      )
+    )
+  };
+  
+  mm_trace_contributions =
+  {
+    mm_style,
+    popup
+    (
+      menu
+      (
+        "Micro-Machinations",
+        [
+          action("Parse", mm_trace_ide_parse),
+          action("Play Back", mm_trace_ide_play)
         ]
       )
     )
   };
     
-  registerLanguage(Machinations_NAME, Machinations_EXT, lang::machinations::Syntax::mm_parse);
+  registerLanguage(MM_NAME, MM_EXT, lang::machinations::Syntax::mm_parse);
+  registerOutliner(MM_NAME, mm_ide_outline);
+  registerContributions(MM_NAME, mm_contributions);
   //registerAnnotator(Machinations_NAME, machinations_check);
-  registerOutliner(Machinations_NAME, mm_ide_outline);
-  registerContributions(Machinations_NAME, c);
+  
+  registerLanguage(MM_TRACE_NAME, MM_TRACE_EXT, lang::machinations::Syntax::mm_trace_parse);
+  registerOutliner(MM_TRACE_NAME, mm_trace_ide_outline);
+  registerContributions(MM_TRACE_NAME, mm_trace_contributions);
 }
 
 //--------------------------------------------------------------------------------
@@ -312,32 +449,38 @@ public void mm_register()
 //--------------------------------------------------------------------------------
 public void probeer()
 {
-  loc f = |project://MM-AiR/test/all.mach4|;
+  loc f = |project://MM-AiR/test/pool2.mm|;
   mm_ide_simulate(mm_parse(f), f);
 }
 
 public void simwar()
 {
-  loc f = |project://MM-AiR/test/examples/simwar_v1.mach4|;
+  loc f = |project://MM-AiR/test/examples/simwar_v1.mm|;
   mm_ide_simulate(mm_parse(f), f);
 }
 
 public void gen()
 {
-  loc f = |project://MM-AiR/test/examples/simwar_v1.mach4|;
+  loc f = |project://MM-AiR/test/examples/simwar_v1.mm|;
   mm_ide_generate(mm_parse(f), f);
 }
 
 public void vis()
 {
-  loc f = |project://MM-AiR/test/examples/bird.mach4|;
+  loc f = |project://MM-AiR/test/examples/bird.mm|;
   mm_ide_visualize(mm_parse(f), f);
 }
 
 public void prom()
 {
-  loc f = |project://MM-AiR/test/source.mach4|;
-  mm_ide_compile(mm_parse(f), f);
+  loc f = |project://MM-AiR/test/activator2.mm|;
+  mm_ide_toPromela(mm_parse(f), f);
+}
+
+public void play()
+{
+  loc f = |project://MM-AiR/test/all2.mmt|;
+  mm_trace_ide_play(mm_trace_transform(mm_trace_parse(f), f));
 }
 
 /*
@@ -379,7 +522,6 @@ private Tree machinations_setLinks(Tree t, map[loc, set[loc]] l)
     }
   }
 }*/
-
 
 private Tree mm_ide_check(Tree t)
 {

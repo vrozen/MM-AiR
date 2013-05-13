@@ -35,6 +35,14 @@ public Machinations mm_desugar (Machinations m)
     {
       insert ctype(n, params, elements + [*es | block(list[Element] es) <- elements] - [e | e: block(_) <- elements]);
     }
+    case src: source(When when, Act act, How how, ID name, list[Unit] opt_u):
+    {
+      insert source(when, act_push(), how_all(), name, opt_u)[@location = src@location]; //override to always push all !!!
+    }
+    case drn: drain(When when, Act act, How how, ID name, list[Unit] opt_u):
+    {
+      insert drain(when, act_pull(), how, name, opt_u)[@location = drn@location]; //override to always pull
+    }
     case at_none():
     {
       insert at_val(0);
@@ -95,8 +103,11 @@ private Element getElement(list[Element] elements, list[ID] name)
   throw "name <name> not found in elements";
 }
 
-private Element desugarFlow(Machinations m, f: flow(list[ID] src, e_one(), list[ID] tgt))
-  = flow(src, e_val(1.,[]), tgt)[@location = f@location];
+private Element desugarFlow(Machinations m, f: flow(list[ID] src, e: e_one(), list[ID] tgt))
+  = flow(src, e_val(1.,[])[@location = e@location], tgt)[@location = f@location];
+  
+private Element desugarFlow(Machinations m, f: flow(list[ID] src, e: e_all(), list[ID] tgt))
+  = flow(src, e_name(src)[@location = e@location], tgt)[@location = f@location];
 
 //NOTE: e_per is only allowed as top-level expression and not as a child-expression
 //TODO: check this in a contextual analyzer
@@ -172,28 +183,30 @@ private Element desugarPer(Machinations m, e: flow(list[ID] src, e_per(Exp exp, 
   {
     //buffer uses input
     act = input.act;
-    how = input.how;
+    //how = input.how; //FIXME
+    how = how_all();  //FIXME
   }
   else if(output.act == act_pull())
   {
     //buffer uses output
     act = output.act;
-    how = output.how;
+    //how = input.how; //FIXME
+    how = how_all();  //FIXME
   }
 
   return block
   (
     [
-      /*timer*/  source(when_auto(), act_push(), how_any(), timerId, [])[@location = e@location],
-      /*reset*/  drain (when_auto(), act_pull(), how_any(), resetId, [])[@location = e@location],
-      /*count*/  pool  (when_passive(), act_pull(), how_any(), countId, [], at_val(2), add_none(), min_none(), max_val(n))[@location = e@location],
+      /*timer*/  source(when_auto(), act_push(), how_all(), timerId, [])[@location = e@location], //FIXME
+      /*reset*/  drain (when_auto(), act_pull(), how_all(), resetId, [])[@location = e@location], //FIXME
+      /*count*/  pool  (when_passive(), act_pull(), how_any(), countId, [], at_val(2), add_none(), min_none(), max_none())[@location = e@location],
       /*buffer*/ pool  (when_auto(), act_pull(), how_any(), bufferId, [], at_val(0), add_none(), min_none(), max_none())[@location = e@location],
       /*flush*/  gate  (when_passive(), act_pull(), how_any(), flushId, [])[@location = e@location],
       flow (src, exp, [bufferId])[@location = e@location],
-      flow (bufferId, e_all(), flushId)[@location = e@location],
-      flow ([flushId], e_all(), tgt)[@location = e@location],
+      flow (bufferId, e_name(bufferId)[@location = e@location], flushId)[@location = e@location],
+      flow ([flushId], e_name(flushId)[@location = e@location], tgt)[@location = e@location],
       flow (timerId, e_val(1., []), countId)[@location = e@location],
-      flow (countId, e_all(), resetId)[@location = e@location],
+      flow (countId, e_name(countId)[@location = e@location], resetId)[@location = e@location],
       state (bufferId, e_eq(e_name(bufferId)[@location=bufferId@location], e_val(0.,[])[@location=e@location]), bufferId)[@location = e@location],
       state (countId, e_eq(e_name(countId)[@location=countId@location], e_val(toReal(n),[])[@location=e@location]), resetId)[@location = e@location],
       state (resetId, e_trigger(), flushId)[@location = e@location]
@@ -229,20 +242,20 @@ public Machinations mm_desugarFlat(Machinations m)
     [
       drain(when, act_pull(), how, drainId, opt_src_u)[@location = e@location],
       state(drainId,e_trigger(),sourceId)[@location = e@location],
-      source(when_passive(), act_push(), how, sourceId, opt_tgt_u)[@location = e@location]
+      source(when_passive(), act_push(), how_all(), sourceId, opt_tgt_u)[@location = e@location]
     ];
   }
     
   for(e: delay(When when, Act act, How how, ID name, list[Unit] opt_u, val) <- m.elements)
   {
-    ID firstId = id("$"+name.name + "1")[@location = name@location];
+    ID firstId = id("_"+name.name + "1")[@location = name@location];
     Element prev = pool(when, act, how, firstId, opt_u, at_val(0), add_none(), min_none(), max_none())[@location = e@location];
     list[Element] es = [prev];
     for(i <- [2..val+1]) //FIXME: range
     {
       //create a pool that automatically pulls all resources
-      ID poolId = id("$"+name.name + "<i>")[@location = e@location]; 
-      Element flow = flow(prev.name, e_all(), poolId)[@location = e@location];
+      ID poolId = id("_"+name.name + "<i>")[@location = e@location]; 
+      Element flow = flow(prev.name, e_name(prev.name), poolId)[@location = e@location];
       Element cur = pool(when_auto(), act, how, poolId, [], at_val(0), add_none(), min_none(), max_none())[@location = e@location];
       //create a flow between the previous element and this one
       prev = cur;    

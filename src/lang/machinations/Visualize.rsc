@@ -98,7 +98,7 @@ public void mm_visualize(Mach2 m2)
   State s = NEW_State(m2);
   TempState ts = NEW_TempState(m2);
   list[tuple[State s, Transition tr]] successors
-    = toList(generate_step(s, ts, m2));
+    = toList(mm_generate_step(s, ts, m2));
   list[tuple[State s, Transition tr]] trace = [];
   int selected = 0;
   Transition tr = successors[0].tr;
@@ -172,7 +172,7 @@ public void mm_visualize(Mach2 m2)
     }
     else
     {
-      successors = toList(generate_step(s, ts, m2));
+      successors = toList(mm_generate_step(s, ts, m2));
     }
     newGraph = true;
   }
@@ -192,7 +192,7 @@ public void mm_visualize(Mach2 m2)
       transitionColor = HAS_UNHAPPENED_COLOR;
   
       //3. calculate the successors of the current state     
-      successors = toList(generate_step(s, ts, m2));
+      successors = toList(mm_generate_step(s, ts, m2));
       newGraph = true;
     }
   }
@@ -328,7 +328,7 @@ public void mm_visualize(Mach2 m2)
       if(size(workStack) < maxDepth)
       {
         //println("\nGo in depth");
-        list[tuple[State,Transition]] sucs = toList(generate_step(s,ts,m2));
+        list[tuple[State,Transition]] sucs = toList(mm_generate_step(s,ts,m2));
         workStack = [sucs, work] + tail(workStack);
         //trace += push(<s,ts>, trace);
       }
@@ -358,7 +358,7 @@ public void mm_visualize(Mach2 m2)
     selected = 0;                
     trace = [];
     s = NEW_State(m2);   
-    successors = toList(generate_step(s, ts, m2));
+    successors = toList(mm_generate_step(s, ts, m2));
     tr = successors[0].tr;
     newGraph = true;
     transitionColor = WILL_HAPPEN_COLOR;

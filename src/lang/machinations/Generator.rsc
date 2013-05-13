@@ -109,7 +109,7 @@ public set[State] mm_generate (Mach2 m2)
 }
 
 
-public set[tuple[State,Transition]] generate_step (State s, TempState ts, Mach2 m2)
+public set[tuple[State,Transition]] mm_generate_step (State s, TempState ts, Mach2 m2)
 {
   set[tuple[State,Transition]] successors = {};
 

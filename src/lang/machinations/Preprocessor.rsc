@@ -126,16 +126,14 @@ public str toString(State s, Mach2 m2) =
   '  Pools:<for(l <- [0..size(s.pools)]){>
   '    <toString(getElement(m2,l).name)>\t: <state_retrieve(s, NEW_TempState(m2), m2, l)><}>
   '  Activated:<for(l <- activeNodes(s, NEW_TempState(m2), m2)){>
-  '    <toString(getElement(m2,l).name)><}>";
+  '    <toString(getElement(m2,l).name)><}>\n";
 
 public str toString(Transition t, Mach2 m2) =
   "--[Transition]----------------------------------<for(<src,f,tgt> <- t){>
-  '  <toString(getElement(m2,src).name)>\t-<f>-\>\t<toString(getElement(m2,tgt).name)><}>";
+  '  <toString(getElement(m2,src).name)>\t-<f>-\>\t<toString(getElement(m2,tgt).name)><}>\n";
   
 public str toString(list[tuple[State,Transition]] trace, Mach2 m2) =
-  "<for(<s,t> <- trace){>
-  '<toString(t, m2)>
-  '<toString(s, m2)><}>";
+  "<for(<s,t> <- trace){><toString(t, m2)><toString(s, m2)><}>";
 
 public void printState(State s, Mach2 m2)
 {
@@ -227,8 +225,8 @@ private list[Element] triggers (Mach2 m2,
 private set[list[int]] interleavings (Mach2 m2)
 {
   set[set[int]] deps = dependents(m2);
-  //println("dependents <deps>");
-  
+  println("dependents <deps>");
+
   list[set[list[int]]] parts;  
   parts = 
   for(s <- deps, size(s) > 1)
@@ -250,8 +248,7 @@ private set[list[int]] interleavings (Mach2 m2)
       }
     }
     prefixes = prefixes_new;
-  }  
-
+  }
   return prefixes;
 }
 
@@ -264,16 +261,28 @@ private set[set[int]] dependents (Mach2 m2)
 }
 
 private set[int] dependents (Mach2 m2,
-    p: pool(When when, act_pull(), How how, ID name, list[Unit] units, At at, Add add, Min min, Max max))
-//  = {tgt@l | f: flow(ID src, Exp exp, ID tgt) <- getOutflow(m2, p@l), getElement(m2, tgt@l).act == act_pull()};
+  p: pool(When when, act_push(), How how, ID name, list[Unit] units, At at, Add add, Min min, Max max))
 {
-  //a = {{println(tgt); 1;} | f: flow(ID src, Exp exp, ID tgt) <- getOutflow(m2, p@l)};
-  return {tgt@l | f: flow(ID src, Exp exp, ID tgt) <- getOutflow(m2, p@l), getElement(m2, tgt@l).act == act_pull()};
+  set[int] deps = {};
+  if(max_val(int v) := max)
+  {
+    deps += {p@l};
+  }  
+  deps += {tgt@l | flow(ID src, Exp exp, ID tgt) <- getOutflow(m2, p@l)};
+  return deps;
 }
 
 private set[int] dependents (Mach2 m2,
-    p: pool(When when, act_push(), How how, ID name, list[Unit] units, At at, Add add, Min min, Max max))
-  = {tgt@l | f: flow(ID src, Exp exp, ID tgt) <- getOutflow(m2, p@l)};
+  p: pool(When when, act_pull(), How how, ID name, list[Unit] units, At at, Add add, Min min, Max max))
+{
+  set[int] deps = {};
+  if(max_val(int v) := max)
+  {
+    deps += {p@l};
+  }
+  deps += {tgt@l | f: flow(ID src, Exp exp, ID tgt) <- getOutflow(m2, p@l), getElement(m2, tgt@l).act == act_pull()};
+  return deps;
+}
 
 private bool hasConstantConditions (Mach2 m2, Element e)
 {

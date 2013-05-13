@@ -258,7 +258,127 @@ public str toString(e_add(Exp e1, Exp e2))
 public str toString(e_sub(Exp e1, Exp e2))
   = "<toString(e1)> - <toString(e2)>";
 
-public str toString(e)
+//------------------------------------------------------------
+//Trace
+//------------------------------------------------------------
+public str toString(trace(list[Event] events))
+  = "<for(Event event <- events){><toString(event)><}>";
+
+public str toString(trace(list[Step] steps))
+  = "<for(Step step <- steps){><toString(step)><}>";
+  
+public str toString(tr_step(list[Event] events))
+  = "<for(Event event <- events){>
+    '<toString(event)><}>";
+
+public str toString(tr_next())
+  = "step";
+
+public str toString(tr_flow(ID src, int val, ID tgt))
+  = "<toString(src)> -<val>-\> <toString(tgt)>";
+
+public str toString(tr_trigger (ID name))
+  = "trigger <toString(name)>";
+  
+public str toString(tr_inhibit (ID name))
+  = "inhibit <toString(name)>";
+  
+public str toString(tr_signal  (ID name))
+  = "signal <toString(name)>";
+  
+public str toString(tr_violate (ID name))
+  = "violate <toString(name)>";
+  
+public str toString(tr_state(list[tuple[ID name, int val]] vals))
+  = "state (<while(vals!=[]){ tuple[ID n,int v] val; <val, vals> = headTail(vals);><toString(val.name)> = <val.val><if(vals!=[]){>, <}><}>)";
+
+//------------------------------------------------------------
+// Fall through cases...
+//------------------------------------------------------------
+public str toString(Machinations m)
 {
-  throw "not supported <e>";
+  throw "Machinations <m> cannot be serialized."; 
+}
+
+public str toString(Element e)
+{
+  throw "Element <e> cannot be serialized."; 
+}
+
+public str toString(Param p)
+{
+  throw "Param <p> cannot be serialized."; 
+}
+
+public str toString(IO io)
+{
+  throw "IO <io> cannot be serialized.";
+}
+
+public str toString(At at)
+{
+  throw "At <at> cannot be serialized.";
+}
+
+public str toString(Add add)
+{
+  throw "Add <add> cannot be serialized.";
+}
+
+public str toString(Min min)
+{
+  throw "Min <min> cannot be serialized.";
+}
+
+public str toString(Max max)
+{
+  throw "Max <max> cannot be serialized.";
+}
+
+public str toString(When when)
+{
+  throw "When <when> cannot be serialized.";
+}
+
+public str toString(Act act)
+{
+  throw "Act <act> cannot be serialized.";
+}
+
+public str toString(How how)
+{
+  throw "How <how> cannot be serialized.";
+}
+
+public str toString(Unit unit)
+{
+  throw "Unit <unit> cannot be serialized.";
+}
+
+public str toString(Exp exp)
+{
+  throw "Exp <exp> cannot be serialized.";
+}
+
+public str toString(ID id)
+{
+  throw "ID <id> cannot be serialized.";
+}
+
+//------------------------------------------------------------
+// Fall through cases...
+//------------------------------------------------------------
+public str toString(Trace t)
+{
+  throw "Trace <t> cannot be serialized.";
+}
+
+public str toString(Step s)
+{
+  throw "Step <s> cannot be serialized.";
+}
+
+public str toString(Event e)
+{
+  throw "Event <e> cannot be serialized.";
 }

@@ -79,7 +79,7 @@ alias TempState =
       int g, //g = gate label
       int v  //v = gate value
     ];       //gate values
-    
+
 alias Transition =
   list //could also be a set
   [

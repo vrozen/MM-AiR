@@ -27,6 +27,9 @@ import lang::machinations::State;
 import lang::machinations::Preprocessor;
 import lang::machinations::Serialize;
 import lang::machinations::Message;
+import lang::machinations::Generator;
+
+private int MAX_INT = 2147483647; //FIXME
 
 public tuple[list[tuple[State,Transition]],list[Msg]]  mm_simulate (Mach2 m2, int depth)
 {
@@ -345,7 +348,6 @@ private Cond generateCondition(State s, TempState ts, Mach2 m2, list[Element] fl
 private Cond generateCondition(State s, TempState ts, Mach2 m2, list[Element] flow /*inFlow or outFlow*/, /*pull or push*/ _, how_all())
   = and([alt([rall(f.s@l,toInt(val),f.t@l) | val <- eval(s,ts,m2,f)]) | f <- flow]);
 
-
 //--------------------------------------------------------------------------------
 //Spawn and delete components at run-time
 //--------------------------------------------------------------------------------
@@ -530,9 +532,10 @@ public int state_retrieve(State s, TempState ts, Mach2 m2, int l)
   } 
 }
 
-public tuple[State,TempState] state_add(State s, TempState ts, Mach2 m2, Transition t)
+public tuple[State,TempState] state_add(State s, TempState ts, Mach2 m2, Transition tr)
 {
-  for(<int src, int f, int tgt> <- t)
+  int src, f, tgt;
+  for(<src, f, tgt> <- tr)
   {
     if(tgt <= size(s.pools)-1)
     {
@@ -553,9 +556,10 @@ public tuple[State,TempState] state_add(State s, TempState ts, Mach2 m2, Transit
   return <s, ts>;
 }
 
-public tuple[State,TempState] state_sub(State s, TempState ts, Mach2 m2, Transition t)
+public tuple[State,TempState] state_sub(State s, TempState ts, Mach2 m2, Transition tr)
 {
-  for(<int src, int f, int tgt> <- t)
+  int src, f, tgt;
+  for(<src, f, tgt> <- tr)
   {
     if(src <= size(s.pools)-1)
     {
@@ -569,6 +573,24 @@ public tuple[State,TempState] state_sub(State s, TempState ts, Mach2 m2, Transit
     }
   }
   return <s,ts>;
+}
+
+
+
+//--------------------------------------------------------------------------------
+//redistribute resources accumulated in gates
+//--------------------------------------------------------------------------------
+private State activateGateTriggers(State s, Mach2 m2, int gate)
+{
+  list[Element] triggers = getTriggers(m2, gate); 
+  for(trigger: state(ID src, Exp e, ID tgt) <- triggers)
+  {
+    if(evalBool(s, trigger) == true)
+    {
+      s.activates += tgt@l;
+    }
+  }
+  return s;
 }
 
 
@@ -591,20 +613,6 @@ public tuple[State, Transition] redistributeGates (State s, TempState ts, Transi
   
   return <s, tr>;
 }
-
-private State activateGateTriggers(State s, Mach2 m2, int gate)
-{
-  list[Element] triggers = getTriggers(m2, gate); 
-  for(trigger: state(ID src, Exp e, ID tgt) <- triggers)
-  {
-    if(evalBool(s, trigger) == true)
-    {
-      s.activates += tgt@l;
-    }
-  }
-  return s;
-}
-
 
 //s = state
 //ts = temp state

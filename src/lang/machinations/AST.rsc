@@ -19,32 +19,47 @@
 module lang::machinations::AST
 import ParseTree;
 
-public int MAX_INT = 2147483647;
-
 anno loc Machinations@location;
 anno loc ID@location;
 anno loc Element@location;
 anno loc Exp@location;
+anno loc Trace@location;
+anno loc Step@location;
+anno loc Event@location;
 anno int Element@l; //label
 anno int ID@l;      //label
 
+/***************************************************************************** 
+ * Public APIs
+ *****************************************************************************/
 public lang::machinations::AST::Machinations mm_implode(Tree t)
   = implode(#lang::machinations::AST::Machinations, t);
+  
+public lang::machinations::AST::Trace mm_trace_implode(Tree t)
+  = implode(#lang::machinations::AST::Trace, t);
 
-/******************************************************************************** 
-  Micro Machinations Traces
-********************************************************************************/
+/***************************************************************************** 
+ * Micro Machinations Traces
+ *****************************************************************************/
 data Trace
-  = trace(list[Event] events);
+  = trace(list[Event] events)   //after parse
+  | trace(list[Step] steps);    //after transform
 
+data Step
+  = tr_step(list[Event] events); //after transform
+  
 data Event
-  = evt_step()
-  | evt_flow(ID s, int val, ID t)
-  | evt_fail(ID name);
+  = tr_next    () //transformed out --> used for tr_step(list[Event] events)
+  | tr_flow    (ID src, int val, ID tgt)
+  | tr_trigger (ID name) //TODO: add trigger source, edge expression
+  | tr_inhibit (ID name) //TODO: add edge expression
+  | tr_signal  (ID name) //TODO: add expression
+  | tr_violate (ID name) //TODO: add: message, expression
+  | tr_state   (list[tuple[ID name, int val]] vals);
 
-/******************************************************************************** 
-  Micro Machinations AST
-********************************************************************************/
+/***************************************************************************** 
+ * Micro Machinations AST
+ *****************************************************************************/
 data Machinations
   = mach(list[Element] elements);
 //Note: A flow from a drain is an error --\> checker
@@ -141,7 +156,7 @@ data Exp
   | e_val(real v, list[Unit] opt_u) //Arithmetic value Expression
   | e_true()                 //Boolean true Expression
   | e_false()                //Boolean false Expression
-  | e_all()                  //Arithmetic all Expression (refers to all resources in al pool)
+  | e_all()                  //Arithmetic all Expression --> desugar: e_name(src name)
   | e_name(list[ID] names)   //namespace query
   | e_name(ID name)          //flattened name space query
   | e_active(list[ID] names) //activity query
@@ -165,8 +180,10 @@ data Exp
   
 data ID
   = id(str name);
- 
-//boolean pattern matching on elements
+
+/***************************************************************************** 
+ * Pattern matching helper functions
+ *****************************************************************************/
 public bool isPool(Element n)
   = (pool (When when, Act act, How how, ID name, list[Unit] units, At at, Add add, Min min, Max max) := n);
 

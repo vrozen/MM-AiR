@@ -37,21 +37,23 @@ data Msg
   | msg_TwiceUsedFlowEdge(Element flow)
   | msg_UnusedFlowEdge(Element flow)
   //runtime errors
-  | msg_AssertionViolated(State s, Element e)  
+  | msg_AssertionViolated(State s, Element e)
+  | msg_SyncLost(Step step, str trace)
   //transformation phase failures
-  | msg_ParserFail(loc l, str err)
-  | msg_ImploderFail(loc l, str err)
-  | msg_DesugarFail(loc l, str err)
-  | msg_LabelerFail(loc l, str err)
-  | msg_FlattenerFail(loc l, str err)
-  | msg_PreprocessorFail(loc l, str err)
-  | msg_LimiterFail(loc l, str err)
-  | msg_EvaluatorFail(loc l, str err)
-  | msg_AssertionFail(loc l, str err)
+  | msg_ParserFail(loc l, value err)
+  | msg_ImploderFail(loc l, value err)
+  | msg_DesugarFail(loc l, value err)
+  | msg_LabelerFail(loc l, value err)
+  | msg_FlattenerFail(loc l, value err)
+  | msg_PreprocessorFail(loc l, value err)
+  | msg_LimiterFail(loc l, value err)
+  | msg_EvaluatorFail(loc l, value err)
+  | msg_AssertionFail(loc l, value err)
+  | msg_ToPromelaFail(loc l, value err)
   ;
 
 public str toString(list[Msg] msgs)
-  = "<for(msg <- msgs){><toString(msg)><}>";
+  = "<for(msg <- msgs){><toString(msg)>\n<}>";
 
 public set[Message] getErrors(list[Msg] messages)
   = {error(toString(m),getLocation(m)) | m <- messages};
@@ -73,7 +75,10 @@ public str toString(msg_MissingAlias(ID c, ID ref))
   
 public str toString(msg_AssertionViolated(State s, Element e))
   = "Assertion <toString(e.name)> violated <toString(e.exp)> : <e.msg>\n";
-  
+
+public str toString(msg_SyncLost(Step step, str err))
+  = "Synchronization lost in <step@location.path> at line <step@location.begin.line> column <step@location.begin.column>\n<err>";
+
 public str toString(msg_DuplicateFlow(Element f1, Element f2))
   = "Duplicate flow between nodes <f1.s.name> and <f1.t.name>\n";
 
@@ -92,29 +97,32 @@ public str toString(msg_TwiceUsedFlowEdge(Element flow))
 public str toString(msg_UnusedFlowEdge(Element flow))
   = "Unused flow between <flow.s.name> and <flow.t.name>";
   
-public str toString(msg_ParserFail(loc l, str err))
+public str toString(msg_ParserFail(loc l, value err))
   = "Parser failure on <l>: <err>";
   
-public str toString(msg_ImploderFail(loc l, str err))
+public str toString(msg_ImploderFail(loc l, value err))
   = "Imploder failure on <l>: <err>";
 
-public str toString(msg_DesugarFail(loc l, str err))
+public str toString(msg_DesugarFail(loc l, value err))
   = "Desugar failure on <l>: <err>";
 
-public str toString(msg_LabelerFail(loc l, str err))
+public str toString(msg_LabelerFail(loc l, value err))
   = "Labeler failure on <l>: <err>";
 
-public str toString(msg_FlattenerFail(loc l, str err))
+public str toString(msg_FlattenerFail(loc l, value err))
   = "Flattener failure on <l>: <err>";
   
-public str toString(msg_EvaluatorFail(loc l, str err))
+public str toString(msg_EvaluatorFail(loc l, value err))
   = "Evaluator failure on <l>: <err>";
 
-public str toString(msg_AssertionFail(loc l, str err))
+public str toString(msg_AssertionFail(loc l, value err))
   = "Assertion failure on <l>: <err>";
 
-public str toString(msg_PreprocessorFail(loc l, str err))
+public str toString(msg_PreprocessorFail(loc l, value err))
   = "Preprocessor failure on <l>: <err>";
 
-public str toString(msg_LimiterFail(loc l, str err))
+public str toString(msg_LimiterFail(loc l, value err))
   = "Limiter failure on <l>: <err>";
+  
+public str toString(msg_ToPromelaFail(loc l, value err))
+  = "Failed to produce Promela model on <l>: <err>";
