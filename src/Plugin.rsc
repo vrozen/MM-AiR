@@ -22,5 +22,5 @@ import lang::machinations::Machinations;
 
 public void main()
 {
-  registerMachinations();
+  mm_register();
 }
