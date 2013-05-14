@@ -32,6 +32,7 @@ import lang::machinations::Message;
 import lang::machinations::Visualize;
 import lang::machinations::ToPromela;
 import lang::machinations::Trace;
+import lang::machinations::Checker;
 
 import ParseTree;
 import util::IDE;
@@ -138,6 +139,9 @@ public tuple[Mach2, list[Msg]] mm_preprocess (Tree t, loc l)
     msgs += [msg_PreprocessorFail(l,toString(e))];
     return <m2, msgs>;
   }
+  
+  msgs += mm_check(m2);
+  
   
   return <m2, msgs>;
 }

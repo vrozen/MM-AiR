@@ -32,13 +32,16 @@ data Msg
   | msg_MissingAlias(ID c, ID ref)
   | msg_DuplicateFlow(Element f1, Element f2)
   | msg_PushingGate(ID name)
+  | msg_PullingOnGate(ID name, ID name2)
   | msg_DrainHasOutflow(ID name, Element flow)
   | msg_SourceHasInflow(ID name, Element flow)
   | msg_TwiceUsedFlowEdge(Element flow)
   | msg_UnusedFlowEdge(Element flow)
+  
   //runtime errors
   | msg_AssertionViolated(State s, Element e)
   | msg_SyncLost(Step step, str trace)
+  
   //transformation phase failures
   | msg_ParserFail(loc l, value err)
   | msg_ImploderFail(loc l, value err)
@@ -74,28 +77,31 @@ public str toString(msg_MissingAlias(ID c, ID ref))
   = "Missing alias <ref.name> in component <c.name> at <ref@location>";
   
 public str toString(msg_AssertionViolated(State s, Element e))
-  = "Assertion <toString(e.name)> violated <toString(e.exp)> : <e.msg>\n";
+  = "Assertion <toString(e.name)> violated <toString(e.exp)> : <e.msg> at <e@location>";
 
 public str toString(msg_SyncLost(Step step, str err))
   = "Synchronization lost in <step@location.path> at line <step@location.begin.line> column <step@location.begin.column>\n<err>";
 
 public str toString(msg_DuplicateFlow(Element f1, Element f2))
-  = "Duplicate flow between nodes <f1.s.name> and <f1.t.name>\n";
+  = "Duplicate flow between nodes <f1.s.name> and <f1.t.name> at <f1@location> and <f2@location>";
 
 public str toString(msg_PushingGate(ID name))
-  = "Pushing gate <name.name>";
+  = "Pushing gate <name.name> at <name@location>";
+
+public str toString(msg_PullingOnGate(ID name, ID name2))
+  = "Element <name.name> is pulling on gate <name2.name> at <name@location>";
   
 public str toString(msg_DrainHasOutflow(ID name, Element flow))
-  = "Drain <name.name> has outflow";
+  = "Drain <name.name> has outflow at <name@location>";
 
 public str toString(msg_SourceHasInflow(ID name, Element flow))
-  = "Source <name.name> has inflow";
+  = "Source <name.name> has inflow at <name@location>";
   
 public str toString(msg_TwiceUsedFlowEdge(Element flow))
-  = "Nodes <flow.s.name> and <flow.t.name> both operate on the same flow.";
+  = "Nodes <flow.s.name> and <flow.t.name> both operate on the same flow at <flow@location>";
 
 public str toString(msg_UnusedFlowEdge(Element flow))
-  = "Unused flow between <flow.s.name> and <flow.t.name>";
+  = "Unused flow between <flow.s.name> and <flow.t.name> at <flow@location>";
   
 public str toString(msg_ParserFail(loc l, value err))
   = "Parser failure on <l>: <err>";
