@@ -7,7 +7,7 @@ auto pool count
 tick --> count
 assert ends : count < 20 "ok"
 
-auto pool A at 4
+pool A at 4
 auto pool B at 0
 auto pool C at 0
 auto gate D

@@ -7,7 +7,7 @@ auto pool count
 tick --> count
 
 source units
-auto pool defence
+pool defence
 units -3|4-> defence
 
 assert ends : count < 16 "ok"
