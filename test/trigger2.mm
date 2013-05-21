@@ -3,6 +3,8 @@ auto pool count
 tick --> count
 assert ends : count < 20 "ok"
 
+source tock
+
 auto source S1
 all source S2
 pool A
