@@ -6,7 +6,7 @@
 pool A at 2
 pool B at 2 add A / 2 + 1
 
-assert ends : false  "ok" //end immediately
+assert ends : A == 0  "ok" //end immediately Note: bug false does not work --> Spin report failure
 
 assert sane : ! false   "boolean not"
 assert sane : 4 != 5    "boolean not equals"
