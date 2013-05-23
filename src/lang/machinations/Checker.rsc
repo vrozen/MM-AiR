@@ -1,9 +1,19 @@
 module lang::machinations::Checker
 
 import lang::machinations::Preprocessor;
+import lang::machinations::Serialize;
 import lang::machinations::Message;
 import lang::machinations::State;
 import lang::machinations::AST;
+import lang::machinations::Syntax;
+import lang::machinations::ToPromela;
+import lang::machinations::Writer;
+import List;
+import Set;
+import IO;
+import String;
+import lang::promela::Spin;
+import ParseTree;
 
 /*
 The contextual analyzer should check for
@@ -23,6 +33,33 @@ The contextual analyzer should check for
 - flow must be positive
 - flow can never fit in pool
 */
+
+//The reach map structure defines which lines
+//must be reached in order for a node to be reached.
+//* all nodes have - one reach_all
+//* any nodes have - one reach_all and three reach any's
+//* nodes can have triggers
+//Note: inhibitor edges are currently missing
+public alias ReachMap
+  = map
+  [
+    int l,           //node label
+    set[Reach] edges //pieces of code generated for edges the node operates on
+  ];
+
+
+//Reach defines which lines of promela
+//must be reached for a node to operate on flows and triggers.
+//Note: flow can be operated on by src and tgt nodes,
+//      which results in separate pieces of Promela code.
+// src  = source label
+// tgt  = target label
+// line = Promela line
+anno int Reach@line;
+public data Reach
+  = reach_flow_all (int l, int edge)
+  | reach_flow_any (int l, int edge)
+  | reach_trigger  (int l, int edge);
 
 public list[Msg] mm_check(Mach2 m2)
   = checkFlow(m2)
@@ -60,6 +97,13 @@ private list[Msg] checkFlow(Mach2 m2)
     }
   }
   return msgs;
+}
+
+private list[Msg] checkTrigger(Mach2 m2)
+{
+  
+  //list[Element] triggers = getTriggers (Mach2 m2, int l);
+  
 }
 
 //for each gate, its Act sate is not act_push()
@@ -114,3 +158,89 @@ private list[Msg] checkSource(Mach2 m2)
   return msgs;
 }
 
+
+public list[Element] mm_checkUnreachable (Mach2 m2)
+{
+  list[int] unreached_lines = []; 
+  loc svr_file = |<m2.m@location.scheme>://<m2.m@location.authority><m2.m@location.path>|;
+  svr_file.extension = "svr";
+  //println("SVR file <svr_file>");
+  
+  Spin report = spin_implode(spin_parse(svr_file));
+  
+  visit(report)
+  {
+    case line 
+    (
+      str file,
+      int line,
+      int state,
+      str text
+    ):
+    {
+      unreached_lines += [line];
+    }
+  }
+  println("Unreached lines <unreached_lines>");
+  
+  
+  loc pml_file = |<m2.m@location.scheme>://<m2.m@location.authority><m2.m@location.path>|;
+  pml_file.extension = "pml";
+  //println("PML file <pml_file>");
+ 
+  list[str] lines = readFileLines(pml_file); 
+  
+  //println("Analyze pml file");
+    
+  list[Reach] rs = [];
+  int l = 0;
+  for(str line <- lines)
+  {
+    l = l + 1;
+    if(contains(line, "MM: reach"))
+    {
+      str reach = substring(line, findLast(line,"MM:") + 4, size(line));
+      Tree t = parse(#lang::machinations::Syntax::Reach, reach);
+      Reach r = implode(#Reach, t);
+      rs = rs + [r[@line = l]];
+    }
+  }
+ 
+  ReachMap r = (e@l: {r | r <- rs, r.l == e@l} | e <- m2.m.elements, isNode(e));  
+  //println(r);
+  
+  list[Element] unreachable = [];
+  for(int l <- r)
+  {
+    Element e = getElement(m2, l);
+    set[Reach] elements = r[l];   
+    set[int] anyFlow = {f@line | f: reach_flow_any (_,_) <- elements};
+    set[int] allFlow = {f@line | f: reach_flow_all (_,_) <- elements};
+    
+    if(e.how == how_any() && anyFlow == {} && size(allFlow)==1)
+    {
+      println("Node <e.name.name> behaves like all instead of any at line <e@location.begin.line> column <e@location.begin.column>");
+    }
+    
+    if((e.when != when_passive() || canBeTriggered(m2,e@l)) && anyFlow == {} && allFlow == {} )
+    {
+      if(e.act == act_pull())
+      {
+        println("Node <toString(e.name)> never pulls at line <e@location.begin.line> column <e@location.begin.column>");
+      }
+      else if(e.act == act_push())
+      {
+        println("Node <toString(e.name)> never pushes at line <e@location.begin.line> column <e@location.begin.column>");      
+      }
+    }
+
+    for(trig: reach_trigger(_, int t) <- elements, trig@line == l)
+    {
+      Element trigger = getElement(m2,t);
+      println("Trigger <toString(trigger)> never activates <toString(trigger.t)> at line <trigger@location.begin.line> column <trigger@location.begin.column>");
+    }
+    
+  }
+  
+  return unreachable; 
+}

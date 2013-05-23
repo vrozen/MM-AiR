@@ -27,7 +27,7 @@ import lang::machinations::Preprocessor;
 import lang::machinations::Labeler;
 import lang::machinations::Serialize;
 import lang::machinations::Evaluator;
-import lang::machinations::Generator;
+import lang::machinations::Trace;
 
 import vis::Figure;
 import vis::Render;
@@ -79,8 +79,13 @@ private str GUIDED_MODE = "Guided Simulation";
 //------------------------------------------------------------------------------
 //External API: mm_visualize
 //------------------------------------------------------------------------------
-
 public void mm_visualize(Mach2 m2)
+  = mm_visualize(m2, trace([]), INTERACTIVE_MODE);
+  
+public void mm_visualize(Mach2 m2, Trace trace)
+  = mm_visualize(m2, trace, GUIDED_MODE);
+
+private void mm_visualize(Mach2 m2, Trace trace, str mode)
 {
   list[Msg] msgs = [];
   
@@ -97,19 +102,41 @@ public void mm_visualize(Mach2 m2)
   //state information
   State s = NEW_State(m2);
   TempState ts = NEW_TempState(m2);
-  list[tuple[State s, Transition tr]] successors
-    = toList(mm_generate_step(s, ts, m2));
-  list[tuple[State s, Transition tr]] trace = [];
+  list[tuple[State s, Transition tr]] successors = [];
+
+  list[tuple[State s, Transition tr]] history = [];
+
+  successors = toList(mm_generate_step(s, ts, m2));
+  
+  if(mode == GUIDED_MODE)
+  {
+    //get the correct successor state for this depth
+    Transition g_tr = step2tr(trace.steps[size(history)]);
+    
+    set[tuple[State, Transition]] matches =
+      {<s2,tr2> | <s2, tr2> <- successors, toSet(g_tr) == toSet(tr2)};
+    
+    if({<s2,tr2>} := matches)
+    {
+      successors = [<s2,tr2>];
+    }
+    else
+    {
+      list[Step] expected = [tr2step(m2, tr2) | <_,tr2> <- successors];
+      msgs += [msg_SyncLost(step,
+              "<toString(s,m2)><for(alt <- expected){>Expected Alternative<toString(alt)><}>\nFound Transition<toString(step)>")];
+      status = toString(msgs);
+    }
+  }
+
   int selected = 0;
   Transition tr = successors[0].tr;
-  list[list[tuple[State s, Transition tr]]] violations = [];
-  int selectedViolation = -1;
     
-  set[State] ss = {};
-  list[list[tuple[State,Transition]]] workStack = [];
-  list[tuple[State,Transition]] work = [];
+  //set[State] ss = {};
+  //list[list[tuple[State,Transition]]] workStack = [];
+  //list[tuple[State,Transition]] work = [];
 
-  str mode = INTERACTIVE_MODE;
+  //str mode = INTERACTIVE_MODE;
   bool newModus = true;
   bool newGraph = true;
   bool pause = true;
@@ -130,7 +157,7 @@ public void mm_visualize(Mach2 m2)
     {
       selected = size(successors) - 1;
     }
-    transitionColor = WILL_HAPPEN_COLOR;    
+    transitionColor = WILL_HAPPEN_COLOR;   
     tr = successors[selected].tr;
     newGraph = true;
   }
@@ -153,96 +180,81 @@ public void mm_visualize(Mach2 m2)
   
   private void step ()
   {
-    //1. add the selected state and transition to the trace
-    trace = push(<s,tr>, trace);
+    //1. add the selected state and transition to the history
+    history = push(<s,tr>, history);
     <s, tr> = successors[selected];
     selected = 0;
 
-    msgs = testAssertions(s,ts,m2);
-    log = toString(msgs);
-
+    list[Msg] failures = testAssertions(s,ts,m2);    
+    if(failures != [])
+    {
+      pause = true;
+    }
+     
+    log = toString(tr2step(m2,tr))
+        + toString(failures) + "\n"
+        + log;
+             
     //2. perform the currently selected transition (select corresponding state)
     transitionColor = HAS_HAPPENED_COLOR;
+
+    successors = toList(mm_generate_step(s, ts, m2));
 
     //3. calculate the successors of the current state
     if(mode == GUIDED_MODE)
     {
       //get the correct successor state for this depth
-      successors = [violations[selectedViolation][size(trace)]];
+      Transition g_tr = step2tr(trace.steps[size(history)]);
+       
+      set[tuple[State, Transition]] matches =
+        {<s2,tr2> | <s2, tr2> <- successors, toSet(g_tr) == toSet(tr2)};
+    
+      if({<s2,tr2>} := matches)
+      {
+        successors = [<s2,tr2>];
+      }
+      else
+      {
+        list[Step] expected = [tr2step(m2, tr2) | <_,tr2> <- successors];
+        msgs += [msg_SyncLost(step,
+                "<toString(s,m2)><for(alt <- expected){>Expected Alternative<toString(alt)><}>\nFound Transition<toString(step)>")];
+        log = toString(msgs) + log;
+      }
+      
+      if(size(history) == size(trace.steps))
+      {
+        pause = true;
+      }
     }
-    else
-    {
-      successors = toList(mm_generate_step(s, ts, m2));
-    }
+    
     newGraph = true;
   }
  
   private void stepBack ()
   {
-    if(trace != [])
+    if(history != [])
     {
       //1. set the state to be the previous state    
-      <<s, tr>, trace> = pop(trace);
+      <<s, tr>, history> = pop(history);
       
-      msgs = testAssertions(s,ts,m2);
-      log = toString(msgs);
-      
-      
-      //2. display the undone transition in RED  
+      log = toString(tr2step(m2,tr))
+          + toString(testAssertions(s,ts,m2)) + "\n"
+          + log;
+         
+      //2. display the undone transition in RED
       transitionColor = HAS_UNHAPPENED_COLOR;
   
       //3. calculate the successors of the current state     
       successors = toList(mm_generate_step(s, ts, m2));
+      
       newGraph = true;
     }
   }
-  
-  private void previousViolation ()
-  {
-    //select the previous transition (if any) and display it
-    if(size(violations) > 0)
-    {
-      if(selectedViolation > 0)
-      {
-        selectedViolation -= 1;
-      }
-      {
-        selectedViolation = size(violations) - 1;
-      }
-      transitionColor = WILL_HAPPEN_COLOR;
-      //TODO: select the violation
-      newGraph = true;
-    }
-  }
-  
-  private void nextViolation ()
-  {
-    if(size(violations) > 0)
-    {
-      if(selectedViolation < size(violations) - 1)
-      {
-        selectedViolation += 1;
-      }
-      else
-      {
-        selectedViolation = 0;
-      }
-      transitionColor = WILL_HAPPEN_COLOR;
-    
-      //TODO: select the violation    
-      newGraph = true;
-    }
-  }
- 
   
   private void automaticStep()
   {
     switch(mode)
     {
-      case EXPLORE_MODE:
-      {
-        explore_step(); 
-      }
       case RANDOM_MODE:
       {
         selected = getOneFrom([0 .. size(successors)]);  
@@ -265,98 +277,14 @@ public void mm_visualize(Mach2 m2)
   }
   
   //----------------------------------------------------------------------------
-  //Declare Model Transformation (Model Check)
-  //----------------------------------------------------------------------------
-  private void explore()
-  {   
-    s = NEW_State(m2);
-    ss = {};
-    msgs = [];
-    workStack = [[<s,[]>]];
-    work = [];
-    pause = false;
-    delay = 10;
-    trace = [];
-    violations = [];
-    transitionColor = HAS_HAPPENED_COLOR;
-  }
-
-  private void explore_step()
-  {
-    if(pause == false && workStack != [])
-    {
-      work = head(workStack);
-      
-      if(work == [])
-      {
-        //println("Out of work at depth <size(workStack)>");
-        workStack = tail(workStack);
-        return;
-      }
-      <<s,tr>, work> = pop(work);
-    
-      if(s in ss)
-      {
-        if(work == [])
-        {
-          //println("Out of work at depth <size(workStack)>");
-          workStack = tail(workStack);
-        }
-        else
-        {
-          workStack[0] = work;
-        }
-        return;
-      }
-    
-      //printState(curState, m2);
-      ss += s;
-        
-      //println("Test assertions");
-      list[Msg] curMsgs = testAssertions(s,ts,m2);    
-      if(curMsgs != [])
-      {
-        msgs += curMsgs;
-        log = toString(curMsgs) + toString(s,m2);
-        
-        //traverse the workstack
-        //violations += [reverse(trace)];
-        
-        return;
-      }
-      
-      if(size(workStack) < maxDepth)
-      {
-        //println("\nGo in depth");
-        list[tuple[State,Transition]] sucs = toList(mm_generate_step(s,ts,m2));
-        workStack = [sucs, work] + tail(workStack);
-        //trace += push(<s,ts>, trace);
-      }
-      else
-      {
-        //println("\nAt max depth");
-        workStack[0] = work;
-      }
-
-      newGraph = true;
-    }
-    
-    if(workStack == [] && pause == false)
-    {
-      pause = true;
-      trace = [];
-      delay = 500;
-    }
-  }
-  
-  //----------------------------------------------------------------------------
   //Declare Model Transformation (Reset)
   //----------------------------------------------------------------------------
   private void reset()
   {
     pause = true;
     selected = 0;                
-    trace = [];
+    history = [];
+    log = "";
     s = NEW_State(m2);   
     successors = toList(mm_generate_step(s, ts, m2));
     tr = successors[0].tr;
@@ -368,10 +296,10 @@ public void mm_visualize(Mach2 m2)
   //Declare Timer for Automatic Steps (might be simulation or generation)
   //---------------------------------------------------------------------------- 
   private TimerAction autoTimer(stopped(n))
-  = restart(delay);
+    = restart(delay);
 
   private TimerAction autoTimer(_)
-  = noChange();
+    = noChange();
 
   //----------------------------------------------------------------------------
   //Declare Generative Controls
@@ -383,7 +311,7 @@ public void mm_visualize(Mach2 m2)
     switch(mode)
     {
       case INTERACTIVE_MODE: lower = interactiveControls();
-      case EXPLORE_MODE: lower = exploreControls();
+      //case EXPLORE_MODE: lower = exploreControls();
       case RANDOM_MODE: lower = automaticControls(RANDOM_MODE);
       case GUIDED_MODE: lower = automaticControls(GUIDED_MODE);
       default: lower = box(text("missing controls"));
@@ -434,11 +362,11 @@ public void mm_visualize(Mach2 m2)
           GUIDED_MODE,
           void(){ mode = GUIDED_MODE; newModus = true; }
         ),
-        button
-        (
-          EXPLORE_MODE,
-          void(){ mode = EXPLORE_MODE; newModus = true; }
-        ),
+        //button
+        //(
+        //  EXPLORE_MODE,
+        //  void(){ mode = EXPLORE_MODE; newModus = true; }
+        //),
         text
         (
           "Graph Options",
@@ -516,7 +444,7 @@ public void mm_visualize(Mach2 m2)
               text("trace depth:", left()),
               text
               (
-                str () { return "<size(trace)>"; },
+                str () { return "<size(history)>"; },
                 left()
               )          
             ],
@@ -525,22 +453,6 @@ public void mm_visualize(Mach2 m2)
               text
               (
                 str () { return "<selected + 1> / <size(successors)>"; },
-                left()
-              )
-            ],
-            [
-              text("violations:", left()),
-              text
-              (
-                str () { return "<size(msgs)>"; },
-                left()                
-              )
-            ],
-            [
-              text("violation selected:", left()),
-              text
-              (
-                str () { return "<selectedViolation + 1> / <size(violations)>"; },
                 left()
               )
             ]
@@ -775,8 +687,9 @@ public void mm_visualize(Mach2 m2)
               text
               (
                 str(){ return log; },
-                fontSize(18),
-                fontColor(color("red"))
+                fontSize(12),
+                fontColor(color("red")),
+                left()
               ),
               vshrink(0.15)
             )

@@ -7,7 +7,7 @@
 }
 /*****************************************************************************/
 /*!
-* Micro-Machinations Preprocessor
+* Micro-Machinations Preprocessor  --> is actually a static analyzer
 * @package      lang::machinations
 * @file         Preprocessor.rsc
 * @brief        The preprocessor processes an AST and calculates constants
@@ -62,9 +62,9 @@ public list[Element] getTriggers (Mach2 m2, int l)
 public list[Element] getActivators (Mach2 m2, int l)
   = m2.activators[l];
   
-public set[list[int]] getInterleavings(Mach2 m2)
+public Interleavings getInterleavings(Mach2 m2)
   = m2.interleavings;
-  
+
 public bool isSource(Mach2 m2, int l)
   = l in m2.sources;
 
@@ -88,6 +88,18 @@ public set[int] getPullNodes(Mach2 m2)
 
 public set[int] getPushNodes(Mach2 m2)
   = m2.pushNodes;
+ 
+public set[int] getPullAllNodes(Mach2 m2)
+  = m2.pullAllNodes;
+  
+public set[int] getPullAnyNodes(Mach2 m2)
+  = m2.pullAnyNodes;
+  
+public set[int] getPushAllNodes(Mach2 m2)
+  = m2.pushAllNodes;
+
+public set[int] getPushAnyNodes(Mach2 m2)
+  = m2.pushAnyNodes;
 
 public Cond getCondition (Mach2 m2, int l)
 {
@@ -160,6 +172,11 @@ public Mach2 mm_preprocess(Machinations m)
   m2.pullNodes = {e@l | e <- m.elements, ((isGate(e) || isPool(e)) && e.act == act_pull()) || isDrain(e) };   
   m2.pushNodes = {e@l | e <- m.elements, ((isGate(e) || isPool(e)) && e.act == act_push()) || isSource(e)};   
 
+  m2.pullAllNodes = {e@l | e <- m.elements, ((isGate(e) || isPool(e)) && e.act == act_pull() && e.how == how_all()) || isDrain(e) };
+  m2.pullAnyNodes = {e@l | e <- m.elements, (isGate(e) || isPool(e)) && e.act == act_pull() && e.how == how_any()};
+  m2.pushAllNodes = {e@l | e <- m.elements, ((isGate(e) || isPool(e)) && e.act == act_push() && e.how == how_all()) || isSource(e)};
+  m2.pushAnyNodes = {e@l | e <- m.elements, (isGate(e) || isPool(e)) && e.act == act_push() && e.how == how_any()};
+
   m2.elements = (e@l : e | e <- m.elements);
 
   m2.inflow     = (e@l : inFlow(m2, e)     | Element e <- m.elements, (isGate(e) || isPool(e) || isSource(e) || isDrain(e)));            
@@ -176,7 +193,7 @@ public Mach2 mm_preprocess(Machinations m)
   m2.conditions = (e@l : generateCondition(s, ts, m2, e) | e <- m.elements,
    (isGate(e) || isPool(e) || isSource(e) || isDrain(e)) && hasConstantConditions(m2,e));
 
-  m2.interleavings = interleavings(m2);
+  m2 = interleavings(m2);
 
   //println("pools: <m2.pools>");
   //println("triggers: <for(t <-m2.triggers){><t> <}>");  
@@ -222,16 +239,49 @@ private list[Element] triggers (Mach2 m2,
   gate (When when, Act act, How how, ID name, list[Unit] opt_u))
   = [ s | s: state(ID src, Exp exp, ID tgt) <- m2.m.elements, src == name];
 
-private set[list[int]] interleavings (Mach2 m2)
-{
-  set[set[int]] deps = dependents(m2);
-  println("dependents <deps>");
 
+private Mach2 interleavings (Mach2 m2)
+{
+  m2.pullAllGroups = groups(m2, act_pull(), how_all());
+  m2.pullAnyGroups = groups(m2, act_pull(), how_any());
+  m2.pushAllGroups = groups(m2, act_push(), how_all());
+  m2.pushAnyGroups = groups(m2, act_push(), how_any());
+  
+  set[list[int]] pull_all_interleavings = groupInterleavings(m2.pullAllGroups);  
+  set[list[int]] pull_any_interleavings = groupInterleavings(m2.pullAnyGroups);
+  set[list[int]] push_all_interleavings = groupInterleavings(m2.pushAllGroups);
+  set[list[int]] push_any_interleavings = groupInterleavings(m2.pushAnyGroups);
+  
+  println("Pull all interleavings <pull_all_interleavings>");
+  println("Pull any interleavings <pull_any_interleavings>");
+  println("Push all interleavings <push_all_interleavings>");
+  println("Push any interleavings <push_any_interleavings>");
+  
+  //mix the interleavings and return them!  
+  m2.interleavings =
+  {
+    <pull_all_i,
+     pull_any_i,
+     push_all_i,
+     push_any_i> |
+     list[int] pull_all_i <- pull_all_interleavings,
+     list[int] pull_any_i <- pull_any_interleavings,
+     list[int] push_all_i <- push_all_interleavings,
+     list[int] push_any_i <- push_any_interleavings    
+  };
+  
+  println("Combined interleavings <m2.interleavings>");
+  
+  return m2;
+}
+
+private set[list[int]] groupInterleavings (set[set[int]] groups)
+{
   list[set[list[int]]] parts;  
   parts = 
-  for(s <- deps, size(s) > 1)
+  for(g <- groups, size(g) > 1)
   {
-    set[list[int]] perms = permutations(toList(s));
+    set[list[int]] perms = permutations(toList(g));
     append perms;   
   }
   
@@ -249,39 +299,119 @@ private set[list[int]] interleavings (Mach2 m2)
     }
     prefixes = prefixes_new;
   }
+  
   return prefixes;
 }
 
-private set[set[int]] dependents (Mach2 m2)
+//calculate groups of competing nodes (act the same, how the same)
+private set[set[int]] groups (Mach2 m2, Act act, How how)
 {
-  set[set[int]] deps = {dependents(m2,p) | p <- m2.m.elements, isPool(p)};
-  deps = { d1 + d2 | d1 <- deps, d2 <- deps, d1 != d2, d1 & d2 != {}, size(d1) > 1, size(d2) > 1}
-       + { d1, d2 | d1 <- deps, d2 <- deps, d1 != d2, d1 & d2 == {}, size(d1) > 1 || size(d2) > 1};
-  return deps;
-}
+  set[set[int]] competitors =
+    {competitors(m2,n@l,n.when,n.act,n.how) | n <- m2.m.elements, isNode(n) && n.act == act, n.how == how};
 
-private set[int] dependents (Mach2 m2,
-  p: pool(When when, act_push(), How how, ID name, list[Unit] units, At at, Add add, Min min, Max max))
-{
-  set[int] deps = {};
-  if(max_val(int v) := max)
-  {
-    deps += {p@l};
-  }  
-  deps += {tgt@l | flow(ID src, Exp exp, ID tgt) <- getOutflow(m2, p@l)};
-  return deps;
-}
+  println("Group competitors <competitors>");
+  
+  set[set[int]] groups
+     = { d1 + d2 | d1 <- competitors, d2 <- competitors, d1 != d2, d1 & d2 != {}, size(d1) > 1, size(d2) > 1}
+     + { d1, d2  | d1 <- competitors, d2 <- competitors, d1 != d2, d1 & d2 == {}, size(d1) > 1 || size(d2) > 1}
+     + { d | d <- competitors, size(competitors) == 1};
 
-private set[int] dependents (Mach2 m2,
-  p: pool(When when, act_pull(), How how, ID name, list[Unit] units, At at, Add add, Min min, Max max))
-{
-  set[int] deps = {};
-  if(max_val(int v) := max)
+  println("groups <groups>");
+  
+  for(g <- groups)
   {
-    deps += {p@l};
+    print("Competing group {");
+    for(c <- g)
+    {
+      print("<getElement(m2,c).name.name> ");
+    }
+    println("}");
   }
-  deps += {tgt@l | f: flow(ID src, Exp exp, ID tgt) <- getOutflow(m2, p@l), getElement(m2, tgt@l).act == act_pull()};
-  return deps;
+ 
+  return groups;
+}
+
+//calculate push competitors of a node with label l
+private set[int] competitors (Mach2 m2, int l /*node label*/, When when, act_push(), How how)
+{
+  set[int] competitors = {};
+  if(when != when_passive() || canBeTriggered(m2, l))
+  {
+    for(flow(ID src, Exp exp, ID tgt) <- getOutflow(m2, l))
+    {
+      Element target = getElement(m2, tgt@l);
+      if(isPool(target) && max_val(int v) := target.max)
+      {
+        for(flow(ID src2, Exp exp2, ID tgt2) <- getInflow(m2, target@l), src2@l != l)
+        {
+          Element competitor = getElement(m2, src2@l);
+          if(competitor.act == act_push() && competitor.how == how &&
+            (competitor.when != when_passive() || canBeTriggered(m2, competitor@l)))
+          {
+            competitors += {competitor@l}; //node competitor competes with node e
+          }
+        }
+      }
+    }
+  }
+  
+  println("Nodes competing with <toString(how)> <getElement(m2,l).name.name> are {<for(int c <- competitors){><getElement(m2,c).name.name> <}>}");
+  
+  if(competitors != {})
+  {
+    competitors += {l};
+  }
+  
+  return competitors; 
+}
+
+//calculate pull competitors of a node with label l
+private set[int] competitors (Mach2 m2, int l /*node label*/, When when, act_pull(), How how)
+{
+  set[int] competitors = {};
+  if(when != when_passive() || canBeTriggered(m2, l))
+  {
+    for(flow(ID src, Exp exp, ID tgt) <- getInflow(m2, l))
+    {
+      Element source = getElement(m2, src@l);
+      if(isPool(source))
+      {
+        for(flow(ID src2, Exp exp2, ID tgt2) <- getOutflow(m2, source@l), tgt2@l != l)
+        {
+          Element competitor = getElement(m2, tgt2@l);     
+          if(competitor.act == act_pull() && competitor.how == how &&
+            (competitor.when != when_passive() || canBeTriggered(m2, competitor@l)))
+          {
+            competitors += {competitor@l}; //node competitor competes with node e
+          }
+        }
+      }
+    }
+    
+    //something that pulls and has a maximum competes with whatever pulls from it
+    Element e = getElement(m2, l);
+    if(isPool(e) && max_val(int v) := e.max) //I'm a pool and have a max, pulling and possibly active
+    {
+      for(flow(ID src, Exp exp, ID tgt) <- getOutflow(m2, l))
+      {
+        Element competitor = getElement(m2, tgt@l);
+        if(competitor.act == act_pull() && competitor.how == how &&
+          (competitor.when != when_passive() || canBeTriggered(m2, competitor@l)))
+        {
+          competitors += {competitor@l};  
+        }
+      }
+    }
+  }
+  
+  println("Nodes competing with <toString(how)> <getElement(m2,l).name.name> are {<for(int c <- competitors){><getElement(m2,c).name.name> <}>}");
+  
+  if(competitors != {})
+  {
+    competitors += {l};
+  }
+  
+  return competitors; 
 }
 
 private bool hasConstantConditions (Mach2 m2, Element e)

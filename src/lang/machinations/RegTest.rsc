@@ -74,26 +74,3 @@ public void mm_testAllToPromela()
     mm_ide_toPromela (mm_parse(f), f);
   }
 }
-
-public void mm_testAllToTrace()
-{
-  set[loc] files = getFiles(MM_TEST_LOC, SPIN_OUT_EXT);
-  for(loc spin_out_loc <- files)
-  {
-    println("read <spin_out_loc>");
-    loc mmt_loc = spin_out_loc;
-    mmt_loc.extension = MM_TRACE_EXT;    
-    str mmt_model = "";
-    list[str] lines = readFileLines(spin_out_loc);
-    for(str line <- lines)
-    {
-      if(startsWith(line, "MM:"))
-      {
-        mmt_model += "<trim(replaceAll(line,"MM:",""))>\n";
-      }
-    }
-    println("write file <mmt_loc>\n<mmt_model>");
-    writeFile(mmt_loc, mmt_model);    
-    //writeFile(mmt_loc, toString(mm_trace_transform(mm_trace_implode(mm_trace_parse(mmt_loc)))));
-  }
-}

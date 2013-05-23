@@ -27,7 +27,7 @@ import lang::machinations::State;
 import lang::machinations::Preprocessor;
 import lang::machinations::Serialize;
 import lang::machinations::Message;
-import lang::machinations::Generator;
+//import lang::machinations::Generator;
 
 private int MAX_INT = 2147483647; //FIXME
 
@@ -55,7 +55,108 @@ public tuple[list[tuple[State,Transition]],list[Msg]]  mm_simulate (Mach2 m2, in
 
 public list[Msg] testAssertions (State s, TempState ts, Mach2 m2)
   = [msg_AssertionViolated(s,n) | n: always(ID name, Exp e, str msg) <- m2.m.elements, evalBool(s, ts, m2, e) == false];
-   
+
+
+
+public set[tuple[State,Transition]] mm_generate_step (State s, TempState ts, Mach2 m2)
+{
+  set[tuple[State,Transition]] successors = {};
+
+  //1: Calculate the set of active nodes. (auto  || activated) && not deactivated
+  set[int] active_nodes 
+    = activeNodes(s, ts, m2);
+    
+  //2: Calculate a set of conditions
+  list[tuple[int, Cond]] conditions
+    = [<l, generateCacheCondition(s, ts, m2, getElement(m2,l))> | l <- active_nodes];
+
+  list[int] pull_all_i;
+  list[int] pull_any_i;
+  list[int] push_all_i;
+  list[int] push_any_i;
+  //4: Choose one node ordering / interleaving
+  for(<pull_all_i, pull_any_i, push_all_i, push_any_i> <- getInterleavings(m2))
+  {
+    //println("interleaving selected <interleaving>");
+    //5. Create States
+    State s1 = s;       //sub flow from here
+    State s2 = s;       //add flow to here
+    TempState ts1 = ts; //sub flow from here
+    TempState ts2 = ts; //add flow to here
+    Transition tr_n;    //generated transition parts
+    
+    //6.1: Solve pull all conditions
+    list[Transition] tr_pull_all = [];
+    tr_pull_all =
+    for(int label <- [i | i <- pull_all_i, i in active_nodes & getPullAllNodes(m2)] +
+                     [a | a <- active_nodes & getPullAllNodes(m2), a notin pull_all_i], 
+        <label, cond> <- conditions)
+    {
+      //6.1.1: for each condition try if it can be validated. if yes then add a flow element to the transition
+      <s1, ts1, s2, ts2, tr_n> = solveCond(s1, ts1, s2, ts2, m2, label, cond);    
+      append tr_n;
+    }
+    
+    //6.2: Solve pull any conditions
+    list[Transition] tr_pull_any = [];
+    tr_pull_any =
+    for(int label <- [i | i <- pull_any_i, i in active_nodes & getPullAnyNodes(m2)] +
+                     [a | a <- active_nodes & getPullAnyNodes(m2), a notin pull_any_i], 
+        <label, cond> <- conditions)
+    {
+      //6.2.1: for each condition try if it can be validated. if yes then add a flow element to the transition
+      <s1, ts1, s2, ts2, tr_n> = solveCond(s1, ts1, s2, ts2, m2, label, cond);    
+      append tr_n;
+    }    
+    
+     //6.3: Solve push all conditions
+    list[Transition] tr_push_all = [];
+    tr_push_all =
+    for(int label <- [i | i <- push_all_i, i in active_nodes & getPushAllNodes(m2)] +
+                     [a | a <- active_nodes & getPushAllNodes(m2), a notin push_all_i], 
+        <label, cond> <- conditions)
+    {
+      //6.3.1: for each condition try if it can be validated. if yes then add a flow element to the transition
+      <s1, ts1, s2, ts2, tr_n> = solveCond(s1, ts1, s2, ts2, m2, label, cond);    
+      append tr_n;
+    }       
+        
+    //6.4: Solve push any conditions
+    list[Transition] tr_push_any = [];
+    tr_push_any =
+    for(int label <- [i | i <- push_any_i, i in active_nodes & getPushAnyNodes(m2)] +
+                     [a | a <- active_nodes & getPushAnyNodes(m2), a notin push_any_i], 
+        <label, cond> <- conditions)
+    {
+      //6.4.1: for each condition try if it can be validated. if yes then add a flow element to the transition
+      <s1, ts1, s2, ts2, tr_n> = solveCond(s1, ts1, s2, ts2, m2, label, cond);    
+      append tr_n;
+    }       
+        
+    //7: Flatten transition list  
+    Transition t = [*tn | tn <- tr_pull_all + tr_pull_any + tr_push_all + tr_push_any];
+  
+    //8: Perform additions.
+    <s1, ts1> = state_add(s1, ts1, m2, t);
+    //s1 = s2;   //s2 has all the additions already
+    //ts1 = ts2; //ts2 has all the additions already 
+  
+    //9: Redistribute resources accumulated in gates.
+    <s1, tr_g> = redistributeGates(s1, ts1, [], m2);
+  
+    Transition t_all = t + tr_g;
+  
+    //10: Activate nodes
+    s1 = activateNodes (s1, m2, t_all);
+
+    successors += <s1,t_all>;
+  }
+  
+  //println("Successors <successors>");
+  return successors;
+}
+
+/*
 public tuple[State, Transition] simulate_step(State s, TempState ts, Mach2 m2)
 { 
   //1: Calculate the set of active nodes. (auto  || activated) && not deactivated
@@ -122,7 +223,7 @@ public tuple[State, Transition] simulate_step(State s, TempState ts, Mach2 m2)
   //println("__");
    
   return <s, t_all>;
-}
+}*/
 
 public set[int] activeNodes (State s, TempState ts, Mach2 m2)
     = {l | l <- getNodes(m2),                                            //retrieve labels of each node
@@ -532,7 +633,7 @@ public int state_retrieve(State s, TempState ts, Mach2 m2, int l)
   } 
 }
 
-public tuple[State,TempState] state_add(State s, TempState ts, Mach2 m2, Transition tr)
+public tuple[State,TempState] state_add (State s, TempState ts, Mach2 m2, Transition tr)
 {
   int src, f, tgt;
   for(<src, f, tgt> <- tr)

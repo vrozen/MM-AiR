@@ -30,7 +30,7 @@ public tuple[Machinations,list[Msg]] mm_flatten(Machinations m)
 {
   map[str, Element] types = (n.name: t | t: ctype (n, _, _ ) <- m.elements);
   <es, msgs> = flatten(id("global scope")[@location = m@location], "", types, m.elements);
-  return <mach(es), msgs>;  
+  return <mach(es)[@location = m@location], msgs>;  
 }
  
 //flattens a list of machinations elements with a name space prefix

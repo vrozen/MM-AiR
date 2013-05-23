@@ -20,6 +20,18 @@ module lang::machinations::State
 
 import lang::machinations::AST;
 
+alias Interleavings =
+  set
+  [
+    tuple
+    [
+      list[int],
+      list[int],
+      list[int],
+      list[int]
+    ]
+  ];
+  
 data Cond
   = rany(int src, int f, int tgt)  //condition is true: if 0 < flow <= f
   | rall(int src, int f, int tgt)  //condition is true: flow == f
@@ -41,14 +53,22 @@ alias Mach2 =
     map[int tgt, list[Element] fs] activators, //is this node deactivated?
     map[int l, Cond c] conditions,             //are the conditions for this node constant?
     map[int l, Element e] elements,            //which element belongs to this label?
-    set[list[int]] interleavings,
+    Interleavings interleavings,
     set[int] sources,
     set[int] drains,
     set[int] pools,
     set[int] gates,
     set[int] nodes,
     set[int] pullNodes,
-    set[int] pushNodes
+    set[int] pushNodes,
+    set[int] pullAllNodes,
+    set[int] pullAnyNodes,
+    set[int] pushAllNodes,
+    set[int] pushAnyNodes,
+    set[set[int]] pullAllGroups,
+    set[set[int]] pullAnyGroups,
+    set[set[int]] pushAllGroups,
+    set[set[int]] pushAnyGroups
   ];
 
 alias State =
@@ -91,4 +111,4 @@ alias Transition =
     ] redist   //redistribution
   ];
 
-public Mach2 NEW_Mach2 = <mach([]),(),(),(),(),(),(),(),(),{},{},{},{},{},{},{},{}>;
+public Mach2 NEW_Mach2 = <mach([]),(),(),(),(),(),(),(),(),{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}>;

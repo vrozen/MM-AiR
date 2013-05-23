@@ -19,13 +19,19 @@
 module lang::machinations::Syntax
 
 /******************************************************************************** 
+  Micro Machinations Reach
+********************************************************************************/
+start syntax Reach
+  = reach_flow_all: "reach_all" "(" VALUE "," VALUE ")"
+  | reach_flow_any: "reach_any" "(" VALUE "," VALUE ")"
+  | reach_trigger:  "reach_trigger" "(" VALUE "," VALUE ")";
+
+/******************************************************************************** 
   Micro Machinations Traces
 ********************************************************************************/
 start syntax Trace
-  = trace: Event*;
-
-//syntax Step
-//  = tr_step: Event*;
+  = trace: Event*
+  | trace: ("MM:" Event)*;
   
 syntax Event
   = tr_flow:    NID "-" VALUE "-" "\>" NID
