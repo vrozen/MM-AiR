@@ -191,8 +191,9 @@ private void mm_visualize(Mach2 m2, Trace trace, str mode)
       pause = true;
     }
      
-    log = toString(tr2step(m2,tr))
-        + toString(failures) + "\n"
+    log = toString(failures) + "\n"
+        + "step\n"
+        + toString(tr2step(m2,tr)) + "\n"        
         + log;
              
     //2. perform the currently selected transition (select corresponding state)
@@ -237,8 +238,10 @@ private void mm_visualize(Mach2 m2, Trace trace, str mode)
       //1. set the state to be the previous state    
       <<s, tr>, history> = pop(history);
       
-      log = toString(tr2step(m2,tr))
-          + toString(testAssertions(s,ts,m2)) + "\n"
+      //FIXME: reverse transition
+      log = toString(testAssertions(s,ts,m2)) + "\n"
+          + "step\n"
+          + toString(tr2step(m2,tr)) + "\n"          
           + log;
          
       //2. display the undone transition in RED
