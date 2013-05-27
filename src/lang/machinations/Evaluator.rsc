@@ -7,7 +7,7 @@
 }
 /*****************************************************************************/
 /*!
-* Machinations Evaluator
+* Machinations Evaluator --> should be called Interpreter
 * @package      lang::machinations
 * @file         Evaluator.rsc
 * @brief        Defines how given a state, its successors are calculated.
@@ -27,7 +27,6 @@ import lang::machinations::State;
 import lang::machinations::Preprocessor;
 import lang::machinations::Serialize;
 import lang::machinations::Message;
-//import lang::machinations::Generator;
 
 private int MAX_INT = 2147483647; //FIXME
 
@@ -65,94 +64,105 @@ public set[tuple[State,Transition]] mm_generate_step (State s, TempState ts, Mac
   //1: Calculate the set of active nodes. (auto  || activated) && not deactivated
   set[int] active_nodes 
     = activeNodes(s, ts, m2);
-    
+  
+  //for(int act <- active_nodes)
+  //{
+  //  println("Node acts <act> : <toString(getElement(m2, act).name)>");
+  //}
+  
   //2: Calculate a set of conditions
-  list[tuple[int, Cond]] conditions
-    = [<l, generateCacheCondition(s, ts, m2, getElement(m2,l))> | l <- active_nodes];
+  map[int, Cond] conditions
+    = (l : generateCacheCondition(s, ts, m2, getElement(m2,l)) | l <- active_nodes);
 
-  list[int] pull_all_i;
-  list[int] pull_any_i;
-  list[int] push_all_i;
-  list[int] push_any_i;
-  //4: Choose one node ordering / interleaving
-  for(<pull_all_i, pull_any_i, push_all_i, push_any_i> <- getInterleavings(m2))
+  set[tuple[State,TempState,Transition]] sub_steps = {<s,ts,[]>};
+
+  //3. Pull All
+  for(set[int] group <- m2.pullAllGroups)
   {
-    //println("interleaving selected <interleaving>");
-    //5. Create States
-    State s1 = s;       //sub flow from here
-    State s2 = s;       //add flow to here
-    TempState ts1 = ts; //sub flow from here
-    TempState ts2 = ts; //add flow to here
-    Transition tr_n;    //generated transition parts
-    
-    //6.1: Solve pull all conditions
-    list[Transition] tr_pull_all = [];
-    tr_pull_all =
-    for(int label <- [i | i <- pull_all_i, i in active_nodes & getPullAllNodes(m2)] +
-                     [a | a <- active_nodes & getPullAllNodes(m2), a notin pull_all_i], 
-        <label, cond> <- conditions)
-    {
-      //6.1.1: for each condition try if it can be validated. if yes then add a flow element to the transition
-      <s1, ts1, s2, ts2, tr_n> = solveCond(s1, ts1, s2, ts2, m2, label, cond);    
-      append tr_n;
-    }
-    
-    //6.2: Solve pull any conditions
-    list[Transition] tr_pull_any = [];
-    tr_pull_any =
-    for(int label <- [i | i <- pull_any_i, i in active_nodes & getPullAnyNodes(m2)] +
-                     [a | a <- active_nodes & getPullAnyNodes(m2), a notin pull_any_i], 
-        <label, cond> <- conditions)
-    {
-      //6.2.1: for each condition try if it can be validated. if yes then add a flow element to the transition
-      <s1, ts1, s2, ts2, tr_n> = solveCond(s1, ts1, s2, ts2, m2, label, cond);    
-      append tr_n;
-    }    
-    
-     //6.3: Solve push all conditions
-    list[Transition] tr_push_all = [];
-    tr_push_all =
-    for(int label <- [i | i <- push_all_i, i in active_nodes & getPushAllNodes(m2)] +
-                     [a | a <- active_nodes & getPushAllNodes(m2), a notin push_all_i], 
-        <label, cond> <- conditions)
-    {
-      //6.3.1: for each condition try if it can be validated. if yes then add a flow element to the transition
-      <s1, ts1, s2, ts2, tr_n> = solveCond(s1, ts1, s2, ts2, m2, label, cond);    
-      append tr_n;
-    }       
-        
-    //6.4: Solve push any conditions
-    list[Transition] tr_push_any = [];
-    tr_push_any =
-    for(int label <- [i | i <- push_any_i, i in active_nodes & getPushAnyNodes(m2)] +
-                     [a | a <- active_nodes & getPushAnyNodes(m2), a notin push_any_i], 
-        <label, cond> <- conditions)
-    {
-      //6.4.1: for each condition try if it can be validated. if yes then add a flow element to the transition
-      <s1, ts1, s2, ts2, tr_n> = solveCond(s1, ts1, s2, ts2, m2, label, cond);    
-      append tr_n;
-    }       
-        
-    //7: Flatten transition list  
-    Transition t = [*tn | tn <- tr_pull_all + tr_pull_any + tr_push_all + tr_push_any];
-  
-    //8: Perform additions.
-    <s1, ts1> = state_add(s1, ts1, m2, t);
-    //s1 = s2;   //s2 has all the additions already
-    //ts1 = ts2; //ts2 has all the additions already 
-  
-    //9: Redistribute resources accumulated in gates.
-    <s1, tr_g> = redistributeGates(s1, ts1, [], m2);
-  
-    Transition t_all = t + tr_g;
-  
-    //10: Activate nodes
-    s1 = activateNodes (s1, m2, t_all);
+    set[list[int]] perms = permutations(toList(group & active_nodes));
+    sub_steps = mm_generate_sub_step(sub_steps, perms, active_nodes, conditions, m2);
+  }
+  list[int] pullAllRemainder = [label | int label <- m2.pullAllRemainder, label in active_nodes];
+  sub_steps = mm_generate_sub_step(sub_steps, {pullAllRemainder}, active_nodes, conditions, m2);
 
-    successors += <s1,t_all>;
+  //4. Pull Any
+  for(set[int] group <- m2.pullAnyGroups)
+  {
+    set[list[int]] perms = permutations(toList(group & active_nodes));
+    sub_steps = mm_generate_sub_step(sub_steps, perms, active_nodes, conditions, m2);
+  }
+  list[int] pullAnyRemainder = [label | int label <- m2.pullAnyRemainder, label in active_nodes];
+  sub_steps = mm_generate_sub_step(sub_steps, {pullAnyRemainder}, active_nodes, conditions, m2);
+
+  //5. Push All
+  for(set[int] group <- m2.pushAllGroups)
+  {
+    set[list[int]] perms = permutations(toList(group & active_nodes));
+    sub_steps = mm_generate_sub_step(sub_steps, perms, active_nodes, conditions, m2);
+  }
+  list[int] pushAllRemainder = [label | int label <- m2.pushAllRemainder, label in active_nodes];
+  sub_steps = mm_generate_sub_step(sub_steps, {pushAllRemainder}, active_nodes, conditions, m2);
+  
+  
+  for(tuple[State s, TempState ts, Transition t] sub_step <- sub_steps)
+  {
+    State s_x = sub_step.s;
+    Transition t_x = sub_step.t;
+    TempState ts_x = sub_step.ts;
+    Transition t_g;
+    
+    <s_x, t_g> = redistributeGates(s_x, ts_x, [], m2);   
+    Transition t_all = t_x + t_g;
+    s_x = activateNodes (s_x, m2, t_all);
+    successors += <s_x,t_all>;
+  }
+
+  //println("Successors <successors>");
+  return successors;
+}
+
+public set[tuple[State,TempState,Transition]] mm_generate_sub_step
+  (set[tuple[State,TempState,Transition]] part,
+   set[list[int]] interleavings, set[int] active_nodes, map[int, Cond] conditions, Mach2 m2)
+{
+  State s;
+  Transition t;
+  set[tuple[State,TempState,Transition]] successors = {};
+    
+  if(interleavings == {} || interleavings == {[]})
+    return part;
+  
+  for(<s,ts,t> <- part)
+  {  
+    for(list[int] interleaving <- interleavings)
+    {
+      //println("apply interleaving <interleaving>");
+      State s1 = s;       //sub flow from here
+      State s2 = s;       //add flow to here
+      TempState ts1 = ts; //sub flow from here
+      TempState ts2 = ts; //add flow to here
+      Transition tr_n;    //generated transition parts
+    
+      //6: Solve conditions
+      list[Transition] tr = [];    
+      tr =
+      for(int label <- interleaving, label in active_nodes)
+      {      
+        //6.1: for each condition try if it can be validated. if yes then add a flow element to the transition
+        <s1, ts1, s2, ts2, tr_n> = solveCond(s1, ts1, s2, ts2, m2, label, conditions[label]);
+        append tr_n;
+      }
+
+      //7: Flatten transition list  
+      Transition t_add = [*tn | Transition tn <- tr];
+
+      <s1, ts1> = state_add(s1, ts1, m2, t_add);
+      successors += <s1,ts1,t+t_add>;
+    }
   }
   
-  //println("Successors <successors>");
+  //println("Temporary Successors <successors>");
+  
   return successors;
 }
 
