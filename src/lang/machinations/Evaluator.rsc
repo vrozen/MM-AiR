@@ -111,6 +111,9 @@ public set[tuple[State,Transition]] mm_generate_step (State s, TempState ts, Mac
     TempState ts_x = sub_step.ts;
     Transition t_g;
     
+    <s_x, ts_x> = state_add(s_x, ts_x, m2, t_x);
+    
+    
     <s_x, t_g> = redistributeGates(s_x, ts_x, [], m2);   
     Transition t_all = t_x + t_g;
     s_x = activateNodes (s_x, m2, t_all);
@@ -156,7 +159,7 @@ public set[tuple[State,TempState,Transition]] mm_generate_sub_step
       //7: Flatten transition list  
       Transition t_add = [*tn | Transition tn <- tr];
 
-      <s1, ts1> = state_add(s1, ts1, m2, t_add);
+      //<s1, ts1> = state_add(s1, ts1, m2, t_add);
       successors += <s1,ts1,t+t_add>;
     }
   }
