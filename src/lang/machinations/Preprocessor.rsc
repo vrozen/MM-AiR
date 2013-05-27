@@ -20,7 +20,6 @@
 
 module lang::machinations::Preprocessor
 
-
 import lang::machinations::AST;
 import lang::machinations::State;
 import lang::machinations::Evaluator;
@@ -62,7 +61,13 @@ public list[Element] getTriggers (Mach2 m2, int l)
 public list[Element] getActivators (Mach2 m2, int l)
   = m2.activators[l];
   
-public Interleavings getInterleavings(Mach2 m2)
+public tuple
+    [
+      set[list[int]] pullAllI,
+      set[list[int]] pullAnyI,
+      set[list[int]] pushAllI,
+      set[list[int]] pushAnyI
+    ] getInterleavings(Mach2 m2)
   = m2.interleavings;
 
 public bool isSource(Mach2 m2, int l)
@@ -179,10 +184,10 @@ public Mach2 mm_preprocess(Machinations m)
 
   m2.elements = (e@l : e | e <- m.elements);
 
-  m2.inflow     = (e@l : inFlow(m2, e)     | Element e <- m.elements, (isGate(e) || isPool(e) || isSource(e) || isDrain(e)));            
-  m2.outflow    = (e@l : outFlow(m2, e)    | Element e <- m.elements, (isGate(e) || isPool(e) || isSource(e) || isDrain(e)));  
-  m2.activators = (e@l : activators(m2, e) | Element e <- m.elements, (isGate(e) || isPool(e) || isSource(e) || isDrain(e)));
-  m2.triggers   = (e@l : triggers(m2, e)   | Element e <- m.elements, (isGate(e) || isPool(e) || isSource(e) || isDrain(e)));
+  m2.inflow     = (e@l : inFlow(m2, e)     | Element e <- m.elements, isNode(e));            
+  m2.outflow    = (e@l : outFlow(m2, e)    | Element e <- m.elements, isNode(e));  
+  m2.activators = (e@l : activators(m2, e) | Element e <- m.elements, isNode(e));
+  m2.triggers   = (e@l : triggers(m2, e)   | Element e <- m.elements, isNode(e));
 
   //for checking triggers / activating nodes in a next step
   m2.inflowLabels =  (l : [f.s@l | f <- m2.inflow[l]] | int l <- m2.inflow);
@@ -193,11 +198,21 @@ public Mach2 mm_preprocess(Machinations m)
   m2.conditions = (e@l : generateCondition(s, ts, m2, e) | e <- m.elements,
    (isGate(e) || isPool(e) || isSource(e) || isDrain(e)) && hasConstantConditions(m2,e));
 
-  m2 = interleavings(m2);
+
+  m2.pullAllGroups = groups(m2, act_pull(), how_all());
+  m2.pullAnyGroups = groups(m2, act_pull(), how_any());
+  m2.pushAllGroups = groups(m2, act_push(), how_all());
+  m2.pushAnyGroups = groups(m2, act_push(), how_any());
+  
+  m2.pullAllRemainder = {l | int l <- m2.pullAllNodes, l notin {*g | set[int] g <- m2.pullAllGroups}};
+  m2.pullAnyRemainder = {l | int l <- m2.pullAnyNodes, l notin {*g | set[int] g <- m2.pullAnyGroups}};
+  m2.pushAllRemainder = {l | int l <- m2.pushAllNodes, l notin {*g | set[int] g <- m2.pushAllGroups}};
+  m2.pushAnyRemainder = {l | int l <- m2.pushAnyNodes, l notin {*g | set[int] g <- m2.pushAnyGroups}};
+  
 
   //println("pools: <m2.pools>");
   //println("triggers: <for(t <-m2.triggers){><t> <}>");  
-  println("interleavings: <m2.interleavings>");
+  //println("interleavings: <m2.interleavings>");
   
   return m2;
 }
@@ -216,7 +231,7 @@ private list[Element] outFlow(Mach2 m2, Element n)
 //  the expression must not be a trigger
 private list[Element] activators (Mach2 m2, Element n)
   = [s | s: state(ID src, Exp exp, ID tgt) <- m2.m.elements,
-    tgt == n.name && exp != e_trigger() && exp != e_ref() && isPool(getElement(m2,src@l))];
+    tgt == n.name && exp != e_trigger() && exp != e_ref() /*&& isPool(getElement(m2,src@l))*/];
 
 //Triggers: the state edges from this pool p that can activate another node
 private list[Element] triggers (Mach2 m2,
@@ -239,42 +254,7 @@ private list[Element] triggers (Mach2 m2,
   gate (When when, Act act, How how, ID name, list[Unit] opt_u))
   = [ s | s: state(ID src, Exp exp, ID tgt) <- m2.m.elements, src == name];
 
-
-private Mach2 interleavings (Mach2 m2)
-{
-  m2.pullAllGroups = groups(m2, act_pull(), how_all());
-  m2.pullAnyGroups = groups(m2, act_pull(), how_any());
-  m2.pushAllGroups = groups(m2, act_push(), how_all());
-  m2.pushAnyGroups = groups(m2, act_push(), how_any());
-  
-  set[list[int]] pull_all_interleavings = groupInterleavings(m2.pullAllGroups);  
-  set[list[int]] pull_any_interleavings = groupInterleavings(m2.pullAnyGroups);
-  set[list[int]] push_all_interleavings = groupInterleavings(m2.pushAllGroups);
-  set[list[int]] push_any_interleavings = groupInterleavings(m2.pushAnyGroups);
-  
-  println("Pull all interleavings <pull_all_interleavings>");
-  println("Pull any interleavings <pull_any_interleavings>");
-  println("Push all interleavings <push_all_interleavings>");
-  println("Push any interleavings <push_any_interleavings>");
-  
-  //mix the interleavings and return them!  
-  m2.interleavings =
-  {
-    <pull_all_i,
-     pull_any_i,
-     push_all_i,
-     push_any_i> |
-     list[int] pull_all_i <- pull_all_interleavings,
-     list[int] pull_any_i <- pull_any_interleavings,
-     list[int] push_all_i <- push_all_interleavings,
-     list[int] push_any_i <- push_any_interleavings    
-  };
-  
-  println("Combined interleavings <m2.interleavings>");
-  
-  return m2;
-}
-
+/*
 private set[list[int]] groupInterleavings (set[set[int]] groups)
 {
   list[set[list[int]]] parts;  
@@ -302,6 +282,7 @@ private set[list[int]] groupInterleavings (set[set[int]] groups)
   
   return prefixes;
 }
+*/
 
 //calculate groups of competing nodes (act the same, how the same)
 private set[set[int]] groups (Mach2 m2, Act act, How how)
