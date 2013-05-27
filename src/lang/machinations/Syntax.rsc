@@ -238,3 +238,5 @@ public start[Trace] mm_trace_parse(str src, loc file) =
 public start[Trace] mm_trace_parse(loc file) =
   parse(#start[Trace], file);
   
+public start[Reach] mm_reach_parse(str text) =
+  parse(#start[Reach], text);
