@@ -3,6 +3,10 @@ auto pool count
 tick --> count
 assert ends : count < 20 "ok"*/
 
+unit Army : "army unit type"
+unit Turn : "player turn"
+unit Card : "bonus card"
+
 source upBonus
 pool bonus at 10
 upBonus -10-> bonus
@@ -17,26 +21,35 @@ upBonus .=.> p1.upBonus
 
 Cards(ref bonus, ref turn, ref upBonus, out armies)
 {
-  pool armies
+  pool armies of Army
   
-  auto pool my_turn
+  auto pool my_turn of Turn
   turn --> my_turn
   
-  source return
+  source return of Turn
   return --> turn
   
-  auto all pool card
-  card .(cav + inf + art) < 5.> card
-  my_turn --> card
+  auto all converter getCard from Turn to Card
+  getCard .(cav + inf + art) < 5.> getCard
+  my_turn --> getCard
+  getCard --> card
   
-  auto all converter xCav //exchange cavlery
-  auto all converter xInf //exchange infantry
-  auto all converter xArt //exchange artillery
-  auto all converter xSet //exchange set  
+  pool card of Card
   
-  auto pool cav //cavalry
-  auto pool inf //infantry
-  auto pool art //artillery
+  auto all converter xCav from Card to Army //exchange cavlery
+  auto all converter xInf from Card to Army //exchange infantry
+  auto all converter xArt from Card to Army //exchange artillery
+  auto all converter xSet from Card to Army //exchange set  
+  
+  auto pool cav of Army at 6//cavalry
+  auto pool inf of Army //infantry
+  auto pool art of Army //artillery
+
+  auto pool getMeABug at 0
+  getMeABug .*.> getMeAnotherBug
+  pool getMeAnotherBug at 0
+  getMeAnotherBug -1-> getMeABug
+  getMeABug -1-> getMeAnotherBug
 
   card --> cav card --> inf card --> art
   cav .*.> return
@@ -53,7 +66,5 @@ Cards(ref bonus, ref turn, ref upBonus, out armies)
   xInf .*.> return xInf .*.> upBonus
   xSet .*.> return xSet .*.> upBonus
   
-  assert test : armies < 74 ""
+  assert ends : armies < 200 "ok"
 }
-
-
