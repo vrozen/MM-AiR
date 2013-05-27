@@ -34,19 +34,6 @@ The contextual analyzer should check for
 - flow can never fit in pool
 */
 
-//The reach map structure defines which lines
-//must be reached in order for a node to be reached.
-//* all nodes have - one reach_all
-//* any nodes have - one reach_all and three reach any's
-//* nodes can have triggers
-//Note: inhibitor edges are currently missing
-public alias ReachMap
-  = map
-  [
-    int l,           //node label
-    set[Reach] edges //pieces of code generated for edges the node operates on
-  ];
-
 
 //Reach defines which lines of promela
 //must be reached for a node to operate on flows and triggers.
@@ -159,6 +146,7 @@ private list[Msg] checkSource(Mach2 m2)
 }
 
 
+//We would like messages instead of Elements that can be processed by the Visualizer
 public list[Element] mm_checkUnreachable (Mach2 m2)
 {
   list[int] unreached_lines = []; 
@@ -170,13 +158,7 @@ public list[Element] mm_checkUnreachable (Mach2 m2)
   
   visit(report)
   {
-    case line 
-    (
-      str file,
-      int line,
-      int state,
-      str text
-    ):
+    case line (str file, int line, int state, str text):
     {
       unreached_lines += [line];
     }
@@ -200,24 +182,34 @@ public list[Element] mm_checkUnreachable (Mach2 m2)
     if(contains(line, "MM: reach"))
     {
       str reach = substring(line, findLast(line,"MM:") + 4, size(line));
-      Tree t = parse(#lang::machinations::Syntax::Reach, reach);
-      Reach r = implode(#Reach, t);
+      Tree t = mm_reach_parse(reach);
+      Reach r = implode(#lang::machinations::Checker::Reach, t);
       rs = rs + [r[@line = l]];
     }
   }
- 
-  ReachMap r = (e@l: {r | r <- rs, r.l == e@l} | e <- m2.m.elements, isNode(e));  
+
+  //The reach map structure defines which lines
+  //must be reached in order for a node to be reached.
+  //* all nodes have - one reach_all
+  //* any nodes have - one reach_all and three reach any's for each flow
+  //* nodes can have triggers
+   map
+  [
+    int l,           //node label
+    set[Reach] edges //pieces of code generated for edges the node operates on
+  ] r = (e@l: {r | r <- rs, r.l == e@l} | e <- m2.m.elements, isNode(e));  
   //println(r);
   
   list[Element] unreachable = [];
   for(int l <- r)
   {
     Element e = getElement(m2, l);
-    set[Reach] elements = r[l];   
-    set[int] anyFlow = {f@line | f: reach_flow_any (_,_) <- elements};
-    set[int] allFlow = {f@line | f: reach_flow_all (_,_) <- elements};
+    set[int] anyFlow = {f@line | f: reach_flow_any (_,_) <- r[l], f@line notin unreached_lines};
+    set[int] allFlow = {f@line | f: reach_flow_all (_,_) <- r[l], f@line notin unreached_lines};
+    //println("<e.name.name> : any <anyFlow> , all <allFlow>");
     
-    if(e.how == how_any() && anyFlow == {} && size(allFlow)==1)
+        
+    if(e.how == how_any() && anyFlow == {} && allFlow != {})
     {
       println("Node <e.name.name> behaves like all instead of any at line <e@location.begin.line> column <e@location.begin.column>");
     }
@@ -232,14 +224,15 @@ public list[Element] mm_checkUnreachable (Mach2 m2)
       {
         println("Node <toString(e.name)> never pushes at line <e@location.begin.line> column <e@location.begin.column>");      
       }
+      unreachable += e;
     }
 
-    for(trig: reach_trigger(_, int t) <- elements, trig@line == l)
+    for(trig: reach_trigger(_, int t) <- r[l], trig@line in unreached_lines)
     {
       Element trigger = getElement(m2,t);
       println("Trigger <toString(trigger)> never activates <toString(trigger.t)> at line <trigger@location.begin.line> column <trigger@location.begin.column>");
+      unreachable += trigger;
     }
-    
   }
   
   return unreachable; 
