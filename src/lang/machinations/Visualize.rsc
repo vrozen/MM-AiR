@@ -97,6 +97,7 @@ private void mm_visualize(Mach2 m2, Trace trace, str mode)
   int maxDepth = DEFAULT_MAX_DEPTH;
   int delay = DEFAULT_DELAY;
   bool showNames = DEFAULT_SHOW_NAMES;
+  bool showLog = false;
   str transitionColor = WILL_HAPPEN_COLOR;
 
   //state information
@@ -458,6 +459,14 @@ private void mm_visualize(Mach2 m2, Trace trace, str mode)
                 str () { return "<selected + 1> / <size(successors)>"; },
                 left()
               )
+            ],
+            [
+              checkbox
+              (
+                "log",
+                true,
+                void(bool showLogState){ showLog = showLogState; newGraph = true; }
+               )
             ]
           ]
         )
@@ -683,7 +692,7 @@ private void mm_visualize(Mach2 m2, Trace trace, str mode)
                 },
                 top()
               ),
-              vshrink(0.85)
+              vshrink(real(){ if(showLog){ return 0.80; } else {return 1.00; } })
             ),
             scrollable
             (
@@ -691,10 +700,10 @@ private void mm_visualize(Mach2 m2, Trace trace, str mode)
               (
                 str(){ return log; },
                 fontSize(12),
-                fontColor(color("red")),
+                fontColor(color("black")),
                 left()
               ),
-              vshrink(0.15)
+              vshrink(real(){ if(showLog){ return 0.20; } else {return 0.00; }})
             )
           ],
           hshrink(0.80)    
@@ -761,8 +770,8 @@ private Edge edgeToFigure(Transition t,
       arrowHead("white")
     ),
     lineWidth(width),
-    lineColor(color),
-    mouseOver(text(toString(exp)))
+    lineColor(color)
+    //,mouseOver(text(toString(exp)))
   );
 }
 
@@ -777,8 +786,8 @@ private Edge edgeToFigure(Transition t,
       arrowHead("white")
     ),
     lineWidth(LINE_WIDTH),
-    lineStyle("dash"),
-    mouseOver(text(toString(exp)))
+    lineStyle("dash")
+    //,mouseOver(text(toString(exp)))
   );
 
 //------------------------------------------------------------------------------
@@ -818,7 +827,16 @@ private Figure nodeToFigure(State s, TempState ts, Mach2 m2, Element e,
             "            <toVisualString(e.when)><toVisualString(e.act)><toVisualString(e.how)>",
             fontSize(toInt(MODIFIER_FONTSIZE * zoom)),
             fontBold(true),
-            align(1.0,0.0)
+            align(1.0,0.0),
+            mouseOver
+            (
+              text
+              (
+                toString(e.name),
+                fontSize(toInt(NAME_FONTSIZE * zoom)),
+                valign(1.0)
+              )
+            )
           )
         ]
       ),
