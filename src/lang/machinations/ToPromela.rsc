@@ -32,7 +32,7 @@ private int MAX_BIT   = 1;
 private int MAX_BYTE  = 255;
 private int MAX_SHORT = toInt(pow(2, 15)) - 1;
 
-private bool debug = false;
+private bool debug = true;
 
 public Writer mm_toPromela(Mach2 m2)
 {
@@ -56,7 +56,7 @@ private map[str,str] storageTypes(Mach2 m2)
   {
     str n = e.name.name;
     str t;  
-    if(e.max? && max_value(v) := e.max)
+    if(e.max? && max_val(int v) := e.max)
     {
       if(v <= MAX_BIT)
       {
@@ -150,7 +150,7 @@ private Writer globals(Writer w, Mach2 m2, map[str,str] ts)
     {
       fs += getInflow(m2, e@l);
     }
-    if((e.act == act_push() && (e.when != when_passive() || canBeTriggered(m2,e@l))) || isGate(e))
+    if((e.act == act_push() && (e.when != when_passive() || canBeTriggered(m2,e@l))))
     {
       fs += getOutflow(m2, e@l);
     }
@@ -159,16 +159,29 @@ private Writer globals(Writer w, Mach2 m2, map[str,str] ts)
       if(e.how == how_all())
       {
         w = writeln(w,
-        "  bool reach_all_<e@l>_<f@l> = false;");
+        "  bool reach_all_<e@l>_<f@l> = false; //<toString(e)>");
       }
       if(e.how == how_any())
       {
         w = writeln(w,
-          "  bool reach_all_<e@l>_<f@l> = false;
-          '  bool reach_any_<e@l>_<f@l> = false;");
+          "  bool reach_all_<e@l>_<f@l> = false; //<toString(e)>
+          '  bool reach_any_<e@l>_<f@l> = false; //<toString(e)>");
       }
     }
   }
+ 
+  w = writeln(w, "//gate reachability");
+  for(Element e <- m2.m.elements, isGate(e))
+  {
+    list[Element] fs = getOutflow(m2, e@l);
+    for (Element f <- fs)
+    {
+      w = writeln(w,
+        "  bool reach_all_<e@l>_<f@l> = false; //<toString(e)>
+        '  bool reach_any_<e@l>_<f@l> = false; //<toString(e)>");
+    }   
+  }
+
 
   //reach triggers
   for(Element e <- m2.m.elements, isNode(e))
@@ -503,16 +516,16 @@ private Writer finalize(Writer w, Mach2 m2)
       '       <n>_old_try = 0;",
       e@location);
   }
-  w = writeln(w, "       };
+  w = writeln(w, "       //};
                  '");  
   
-  //currently still non-deterministic
+  //currently still non-deterministic FIXME: pretend it is
   w = redistribute(w, m2);
   
   w = writeln(w,
-              "       skip; //jump into d_step not allowed 
-              '       d_step
-              '       {");
+              "       //skip; //jump into d_step not allowed 
+              '       //d_step
+              '       //{");
   
   for(Element e <- [e | e <- m2.m.elements, isNode(e)])  
   {  
@@ -753,6 +766,8 @@ private Writer redistribute(Writer w, Mach2 m2, g: gate(When when, Act act, How 
 
   return writeln(w,
      ":: <name> != 0 -\>
+         //d_step
+         //{
          if
          <for(selected <- [0..size(fs)]){
            Element f = fs[selected];
@@ -819,7 +834,8 @@ private Writer redistribute(Writer w, Mach2 m2, g: gate(When when, Act act, How 
                <if(selected < size(fs) - 1){><name>_s = <name>_s + 1; <} else {><name>_s = 0;<}> //select the next edge 
            fi;<}>
          :: else -\> printf(\"MM: violate sane\\n\"); assert(false);
-         fi;",
+         fi;
+         //}; //end d_step",
      g@location);
 }
 
@@ -941,7 +957,7 @@ private Writer toPromela(Writer w, Mach2 m2, Element e, act_push(), how_all())
             
   w = writeln(w,
     "         if
-    '         :: commit == true -\><
+    '         :: commit == true; <
                  for(f: flow(src,exp,tgt) <- getOutflow(m2, e@l)){
                    str src_name = toString(src);
                    str tgt_name = toString(tgt);><
@@ -979,6 +995,8 @@ private Writer toPromela(Writer w, Mach2 m2, int l, e: flow(ID src, Exp exp, ID 
   str tgt_name = toString(tgt);
   bool srcIsPool = isPool(m2, src@l);
   bool tgtIsPool = isPool(m2, tgt@l);
+  bool tgtIsGate = isGate(m2, tgt@l);
+  bool tgtIsDrain = isDrain(m2, tgt@l);
   int max = 0;
   if(tgtIsPool)
   {
@@ -1000,6 +1018,8 @@ private Writer toPromela(Writer w, Mach2 m2, int l, e: flow(ID src, Exp exp, ID 
     '                  <if(srcIsPool){><src_name>_old_try = <src_name>_old_try - flow;<}>
     '                  <if(tgtIsPool){><tgt_name>_new_try = <tgt_name>_new_try + flow;<}>
     '                  <if(srcIsPool){><src_name>_new_try = <src_name>_new_try - flow;<}>
+    '                  <if(tgtIsGate){><tgt_name> = <tgt_name> + flow;<}>
+    '                  <if(tgtIsDrain){>skip;<}>
     '               :: else -\>  //roll-back transaction
     '                  commit = false;
     '               fi;",
