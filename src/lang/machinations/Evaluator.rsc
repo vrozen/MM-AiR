@@ -426,7 +426,7 @@ public Cond generateCondition(State s, TempState ts, Mach2 m2,
 //Pulling drain (no pushing drains exist)
 public Cond generateCondition(State s, TempState ts, Mach2 m2,
   e: drain(When when, Act act, How how, ID name, list[Unit] opt_u))
- = generateCondition(s, ts, m2, getInflow(m2, e@l), act_push(), how);
+ = generateCondition(s, ts, m2, getInflow(m2, e@l), act_pull(), how);
 
 //Pulling pool
 public Cond generateCondition(State s, TempState ts, Mach2 m2,
