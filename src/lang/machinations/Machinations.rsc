@@ -281,14 +281,16 @@ public tuple[Mach2 m2, list[tuple[State s, Transition tr]] trace, list[Msg] msgs
 public tuple[Writer,list[Msg]] mm_toPromela(Tree t, loc l)
 {
   tuple[Mach2 m2, list[Msg] msgs] phase1 = mm_limit(t, l);
-  tuple[Writer w, list[Msg] msgs] result = <writer(l),[]>;
-    
+  
+  Writer w = writer(l);
+  
   if(phase1.msgs == [])
   { 
-    result.w = mm_toPromela(phase1.m2);
+    w = mm_toPromela(phase1.m2);
+    writeFile(w);
   }
 
-  return result;
+  return <w, phase1.msgs>;
 }
 
 //--------------------------------------------------------------------------------
@@ -352,19 +354,6 @@ public void mm_ide_toPromela (Tree t, loc l)
 {
   println("Compile file <l> to Promela.");
   tuple[Writer w, list[Msg] msgs] phase1 = mm_toPromela(t, l);
-  list[Msg] msgs = phase1.msgs;
- 
-  if(msgs == [])
-  {
-    try
-    {
-      writeFile(phase1.w);
-    }
-    catch e:
-    {
-      msgs += [msg_ToPromelaFail(l,e)];
-    }
-  }
   
   if(phase1.msgs != [])
   {
@@ -509,7 +498,7 @@ public void mm_register()
   //registerAnnotator(Machinations_NAME, machinations_check);
   
   registerLanguage(MM_TRACE_NAME, MM_TRACE_EXT, lang::machinations::Syntax::mm_trace_parse);
-  registerOutliner(MM_TRACE_NAME, mm_trace_ide_outline);
+  //registerOutliner(MM_TRACE_NAME, mm_trace_ide_outline);
   registerContributions(MM_TRACE_NAME, mm_trace_contributions);
 }
 

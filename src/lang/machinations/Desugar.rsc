@@ -41,7 +41,7 @@ public Machinations mm_desugar (Machinations m)
     }
     case drn: drain(When when, Act act, How how, ID name, list[Unit] opt_u):
     {
-      insert drain(when, act_pull(), how, name, opt_u)[@location = drn@location]; //override to always pull
+      insert drain(when, act_pull(), how, name, opt_u)[@location = drn@location]; //override to always pull (any or all)
     }
     case at_none():
     {
@@ -198,7 +198,7 @@ private Element desugarPer(Machinations m, e: flow(list[ID] src, e_per(Exp exp, 
   (
     [
       /*timer*/  source(when_auto(), act_push(), how_all(), timerId, [])[@location = e@location], //FIXME
-      /*reset*/  drain (when_auto(), act_pull(), how_all(), resetId, [])[@location = e@location], //FIXME
+      /*reset*/  drain (when_auto(), act_pull(), how_any(), resetId, [])[@location = e@location], //FIXME
       /*count*/  pool  (when_passive(), act_pull(), how_any(), countId, [], at_val(2), add_none(), min_none(), max_none())[@location = e@location],
       /*buffer*/ pool  (when_auto(), act_pull(), how_any(), bufferId, [], at_val(0), add_none(), min_none(), max_none())[@location = e@location],
       /*flush*/  gate  (when_passive(), act_pull(), how_any(), flushId, [])[@location = e@location],
@@ -248,13 +248,13 @@ public Machinations mm_desugarFlat(Machinations m)
     
   for(e: delay(When when, Act act, How how, ID name, list[Unit] opt_u, val) <- m.elements)
   {
-    ID firstId = id("_"+name.name + "1")[@location = name@location];
+    ID firstId = id(name.name + "1")[@location = name@location];
     Element prev = pool(when, act, how, firstId, opt_u, at_val(0), add_none(), min_none(), max_none())[@location = e@location];
     list[Element] es = [prev];
     for(i <- [2..val+1]) //FIXME: range
     {
       //create a pool that automatically pulls all resources
-      ID poolId = id("_"+name.name + "<i>")[@location = e@location]; 
+      ID poolId = id(name.name + "<i>")[@location = e@location]; 
       Element flow = flow(prev.name, e_name(prev.name), poolId)[@location = e@location];
       Element cur = pool(when_auto(), act, how, poolId, [], at_val(0), add_none(), min_none(), max_none())[@location = e@location];
       //create a flow between the previous element and this one

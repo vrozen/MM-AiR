@@ -177,10 +177,10 @@ public Mach2 mm_preprocess(Machinations m)
   m2.pullNodes = {e@l | e <- m.elements, ((isGate(e) || isPool(e)) && e.act == act_pull()) || isDrain(e) };   
   m2.pushNodes = {e@l | e <- m.elements, ((isGate(e) || isPool(e)) && e.act == act_push()) || isSource(e)};   
 
-  m2.pullAllNodes = {e@l | e <- m.elements, ((isGate(e) || isPool(e)) && e.act == act_pull() && e.how == how_all()) || isDrain(e) };
-  m2.pullAnyNodes = {e@l | e <- m.elements, (isGate(e) || isPool(e)) && e.act == act_pull() && e.how == how_any()};
-  m2.pushAllNodes = {e@l | e <- m.elements, ((isGate(e) || isPool(e)) && e.act == act_push() && e.how == how_all()) || isSource(e)};
-  m2.pushAnyNodes = {e@l | e <- m.elements, (isGate(e) || isPool(e)) && e.act == act_push() && e.how == how_any()};
+  m2.pullAllNodes = {e@l | e <- m.elements, isNode(e) && e.act == act_pull() && e.how == how_all()};
+  m2.pullAnyNodes = {e@l | e <- m.elements, isNode(e) && e.act == act_pull() && e.how == how_any()};
+  m2.pushAllNodes = {e@l | e <- m.elements, isNode(e) && e.act == act_push() && e.how == how_all()};
+  m2.pushAnyNodes = {e@l | e <- m.elements, isNode(e) && e.act == act_push() && e.how == how_any()};
 
   m2.elements = (e@l : e | e <- m.elements);
 
@@ -208,6 +208,19 @@ public Mach2 mm_preprocess(Machinations m)
   m2.pullAnyRemainder = {l | int l <- m2.pullAnyNodes, l notin {*g | set[int] g <- m2.pullAnyGroups}};
   m2.pushAllRemainder = {l | int l <- m2.pushAllNodes, l notin {*g | set[int] g <- m2.pushAllGroups}};
   m2.pushAnyRemainder = {l | int l <- m2.pushAnyNodes, l notin {*g | set[int] g <- m2.pushAnyGroups}};
+  
+
+  println("1: pull all groups: <m2.pullAllGroups>");
+  println("2: pull all remainder: <m2.pullAllRemainder>");
+  
+  println("3: pull any groups: <m2.pullAnyGroups>");
+  println("4: pull any remainder: <m2.pullAnyRemainder>");
+
+  println("5: push all groups: <m2.pushAllGroups>");
+  println("6: push all remainder: <m2.pushAllRemainder>");
+  
+  println("7: push any groups: <m2.pushAnyGroups>");
+  println("8: push any remainder: <m2.pushAnyRemainder>");
   
 
   //println("pools: <m2.pools>");
@@ -253,36 +266,6 @@ private list[Element] triggers (Mach2 m2,
 private list[Element] triggers (Mach2 m2,
   gate (When when, Act act, How how, ID name, list[Unit] opt_u))
   = [ s | s: state(ID src, Exp exp, ID tgt) <- m2.m.elements, src == name];
-
-/*
-private set[list[int]] groupInterleavings (set[set[int]] groups)
-{
-  list[set[list[int]]] parts;  
-  parts = 
-  for(g <- groups, size(g) > 1)
-  {
-    set[list[int]] perms = permutations(toList(g));
-    append perms;   
-  }
-  
-  set[list[int]] prefixes = {[]};
-  while(parts != [])
-  {
-    <part, parts> = headTail(parts);
-    set[list[int]] prefixes_new = {};
-    for(perm <- part)
-    {
-      for(prefix <- prefixes)
-      {
-        prefixes_new += {prefix + perm};
-      }
-    }
-    prefixes = prefixes_new;
-  }
-  
-  return prefixes;
-}
-*/
 
 //calculate groups of competing nodes (act the same, how the same)
 private set[set[int]] groups (Mach2 m2, Act act, How how)
@@ -336,7 +319,7 @@ private set[int] competitors (Mach2 m2, int l /*node label*/, When when, act_pus
     }
   }
   
-  println("Nodes competing with <toString(how)> <getElement(m2,l).name.name> are {<for(int c <- competitors){><getElement(m2,c).name.name> <}>}");
+  println("Nodes competing with <l> <toString(how)> <getElement(m2,l).name.name> are {<for(int c <- competitors){><getElement(m2,c).name.name> <}>}");
   
   if(competitors != {})
   {
@@ -385,7 +368,7 @@ private set[int] competitors (Mach2 m2, int l /*node label*/, When when, act_pul
     }
   }
   
-  println("Nodes competing with <toString(how)> <getElement(m2,l).name.name> are {<for(int c <- competitors){><getElement(m2,c).name.name> <}>}");
+  println("Nodes competing with <l> <toString(how)> <getElement(m2,l).name.name> are {<for(int c <- competitors){><getElement(m2,c).name.name> <}>}");
   
   if(competitors != {})
   {
@@ -431,7 +414,7 @@ bool hasDynamics(flow(ID src, Exp exp, ID tgt))
 }
 
 public set[int] triggeredBy(Mach2 m2, int l)
-  = {e@l | e: state(ID s, e_trigger(), ID t) <- m2.m.elements, t@l == l};
+  = {s@l | e: state(ID s, e_trigger(), ID t) <- m2.m.elements, t@l == l};
 
 public bool canBeTriggered(Mach2 m2, int l)
   = triggeredBy(m2,l) != {};

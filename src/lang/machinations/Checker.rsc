@@ -78,7 +78,7 @@ private list[Msg] checkFlow(Mach2 m2)
     {
       msgs += [msg_TwiceUsedFlowEdge(f1)];
     }
-    else if(s.act == act_pull() && t.act == act_push())
+    else if(s.act == act_pull() && t.act == act_push() && !isGate(s))
     {
       msgs += [msg_UnusedFlowEdge(f1)];
     }
