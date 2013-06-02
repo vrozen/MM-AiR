@@ -80,7 +80,7 @@ syntax String
   = @category="String"  "\"" STRING "\"";
 
 lexical VALUE
-  = @category="Value" ([0-9]+([.][0-9]+?)?);  
+  = @category="Value" ([0-9]+([.][0-9]+?)?)([e][+\-][0-9]+)?;
 
 lexical NAME
   = @category="Name" ([a-zA-Z_$.] [a-zA-Z0-9_$.]* !>> [a-zA-Z0-9_$.]);
